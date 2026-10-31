@@ -206,3 +206,38 @@ lines.push("commit;");
 
 writeFileSync(new URL("../supabase/seed.sql", import.meta.url), lines.join("\n") + "\n");
 console.log(`services ${services.length}, providers ${providers.length}, provider_services ${providerServices.length}, reviews ${reviews.length}`);
+
+// Compact variant with identical rows: repeated text is stored once and expanded in SQL.
+// Used to push the seed through tools with size limits.
+{
+  const bodies = [...new Set(reviews.map((r) => r.body))];
+  const authors = [...new Set(reviews.map((r) => r.author))];
+  const pIndex = new Map(providers.map((p, i) => [p.id, i + 1]));
+  const bioOf = new Map(providers.map((p) => [p.id, p.bio]));
+  const bioTail = " Bookings run on HaloDiary, so reminders, changes and payments are handled automatically.";
+  const out = [];
+  out.push("begin;");
+  out.push(lines.slice(2, 5).join("\n"));
+  out.push(lines[6] + "\n" + lines[7]);
+  const prov = providers.map((p) => {
+    const svc = bioOf.get(p.id).match(/with (.*) for years/)[1];
+    return [p.id, p.name, p.headline, svc, p.hue, p.rating, p.reviewCount, p.years, p.languages, p.responds, p.verified, p.north, p.east];
+  });
+  out.push(`insert into public.providers (id, display_name, headline, bio, avatar_hue, rating, review_count, years_experience, languages, responds_within_hours, verified, is_demo, offset_north_km, offset_east_km)
+select (r->>0)::uuid, r->>1, r->>2,
+  split_part(r->>1, ' ', 1) || ' has been helping households with ' || (r->>3) || ' for years and works around your routine.' || ${q(bioTail)},
+  (r->>4)::int, (r->>5)::numeric, (r->>6)::int, (r->>7)::int, array(select jsonb_array_elements_text(r->8)), (r->>9)::int, (r->>10)::boolean, true, (r->>11)::float8, (r->>12)::float8
+from jsonb_array_elements(${q(JSON.stringify(prov))}::jsonb) r
+on conflict (id) do nothing;`);
+  out.push(`insert into public.provider_services (provider_id, service_id, price)
+select (r->>0)::uuid, r->>1, (r->>2)::numeric from jsonb_array_elements(${q(JSON.stringify(providerServices))}::jsonb) r
+on conflict do nothing;`);
+  const rv = reviews.map((r) => [pIndex.get(r.provider), r.service, authors.indexOf(r.author), r.rating, bodies.indexOf(r.body), r.daysAgo]);
+  out.push(`with p as (select (r->>0)::uuid id, n from jsonb_array_elements(${q(JSON.stringify(providers.map((p) => [p.id])))}::jsonb) with ordinality t(r, n)),
+a as (select ${q(JSON.stringify(authors))}::jsonb j), b as (select ${q(JSON.stringify(bodies))}::jsonb j)
+insert into public.reviews (provider_id, service_id, author_name, rating, body, created_at)
+select p.id, r->>1, (select j->>((r->>2)::int) from a), (r->>3)::int, (select j->>((r->>4)::int) from b), now() - make_interval(days => (r->>5)::int)
+from jsonb_array_elements(${q(JSON.stringify(rv))}::jsonb) r join p on p.n = (r->>0)::int;`);
+  out.push("commit;");
+  writeFileSync(new URL("../supabase/seed-compact.sql", import.meta.url), out.join("\n\n") + "\n");
+}
