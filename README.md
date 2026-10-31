@@ -6,6 +6,8 @@ HaloDiary runs a household's recurring services (cleaning twice a week, tutoring
 
 Built for the PayPal AI Hackathon (Devpost, November 2026).
 
+**Live demo:** https://halodiary.vercel.app (press "Try it instantly", no email needed)
+
 ## What judges can try
 
 1. Open the live demo and press **Try it instantly** (or create an account).
