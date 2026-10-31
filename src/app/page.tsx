@@ -1,102 +1,98 @@
-import Image from "next/image";
+import { ButtonLink, Halo, Logo } from "@/components/ui";
+import { DemoLoginButton } from "./demo-login";
 
-export default function Home() {
+const week = [
+  { day: "Mon", items: ["Tutoring 16:30"], fill: 0.25 },
+  { day: "Tue", items: ["Cleaning 10:00"], fill: 0.3 },
+  { day: "Wed", items: ["Tutoring 16:30", "Security check 18:00"], fill: 0.55 },
+  { day: "Thu", items: [], fill: 0 },
+  { day: "Fri", items: ["Cleaning 10:00", "Tutoring 16:30"], fill: 0.6 },
+  { day: "Sat", items: ["Dog walk 09:00", "Pool 11:00"], fill: 0.65 },
+  { day: "Sun", items: ["Dog walk 09:00"], fill: 0.3 },
+];
+
+export default function Landing() {
   return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+    <div className="mx-auto flex min-h-dvh max-w-6xl flex-col px-5 sm:px-8">
+      <header className="flex items-center justify-between py-6">
+        <Logo />
+        <nav className="flex items-center gap-2">
+          <ButtonLink href="/login" variant="ghost">
+            Log in
+          </ButtonLink>
+        </nav>
+      </header>
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
+      <main className="grid flex-1 items-center gap-12 py-10 lg:grid-cols-[1.05fr_1fr] lg:py-16">
+        <section>
+          <h1 className="max-w-xl text-[2.6rem] font-extrabold leading-[1.02] sm:text-6xl">
+            Book every recurring service once. Never chase one again.
+          </h1>
+          <p className="mt-6 max-w-lg text-lg leading-relaxed text-slate">
+            Cleaning twice a week, tutoring three times, the dog walker on weekends, the car every quarter. HaloDiary
+            keeps them on one diary, checks with everyone the day before, and pays through PayPal inside a budget you
+            approve once a month.
+          </p>
+          <div className="mt-8 flex flex-wrap items-center gap-3">
+            <ButtonLink href="/signup" variant="primary">
+              Start your diary
+            </ButtonLink>
+            <DemoLoginButton />
+          </div>
+          <dl className="mt-12 grid max-w-lg grid-cols-3 gap-6 border-t border-mist pt-6">
+            <div>
+              <dt className="text-sm text-slate">Bookings a year, typical busy home</dt>
+              <dd className="font-display text-3xl font-extrabold">400</dd>
+            </div>
+            <div>
+              <dt className="text-sm text-slate">Payment approvals a month</dt>
+              <dd className="font-display text-3xl font-extrabold">1</dd>
+            </div>
+            <div>
+              <dt className="text-sm text-slate">Questions you answer per visit</dt>
+              <dd className="font-display text-3xl font-extrabold">0 or 1</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section aria-label="A week on HaloDiary" className="rounded-[2rem] border border-mist bg-card p-6 sm:p-8">
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-xl font-bold">This week</h2>
+            <span className="text-sm text-slate">9 visits, all confirmed</span>
+          </div>
+          <ol className="mt-6 grid grid-cols-7 gap-1.5 sm:gap-3">
+            {week.map((d, i) => (
+              <li key={d.day} className="flex flex-col items-center gap-2">
+                <Halo fill={d.fill} size={44} animate label={`${d.day}: ${d.items.length} visits`}>
+                  <span className="text-[11px] font-bold">{d.day}</span>
+                </Halo>
+                <span className="sr-only">{d.items.join(", ")}</span>
+                <span className="hidden text-center text-[11px] leading-tight text-slate sm:block" style={{ animationDelay: `${i * 60}ms` }}>
+                  {d.items.length ? d.items.length : "Free"}
+                </span>
+              </li>
+            ))}
+          </ol>
+          <div className="mt-8 rounded-2xl bg-paper p-5">
+            <p className="text-sm text-slate">Tomorrow, 10:00</p>
+            <p className="mt-1 font-display text-lg font-bold">Cleaning with Amara S.</p>
+            <p className="mt-1 text-sm text-slate">Amara has confirmed. Go ahead as planned?</p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <span className="rounded-full bg-ink px-4 py-1.5 text-sm font-bold text-white">Proceed</span>
+              <span className="rounded-full border border-mist bg-card px-4 py-1.5 text-sm font-bold">Move it</span>
+              <span className="rounded-full border border-mist bg-card px-4 py-1.5 text-sm font-bold">Skip</span>
+            </div>
+          </div>
+          <div className="mt-4 flex items-center justify-between rounded-2xl border border-dashed border-mist p-5 text-sm">
+            <span>November budget, approved with PayPal</span>
+            <span className="font-bold">€640 cap</span>
+          </div>
+        </section>
       </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+
+      <footer className="flex flex-col gap-2 border-t border-mist py-6 text-sm text-slate sm:flex-row sm:justify-between">
+        <span>Built for the PayPal AI Hackathon. Payments run in the PayPal sandbox; no real money moves.</span>
+        <span>Demo providers are generated and appear around your location.</span>
       </footer>
     </div>
   );

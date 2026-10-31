@@ -1,36 +1,90 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# HaloDiary
 
-## Getting Started
+**Book every recurring service once. Never chase one again.**
 
-First, run the development server:
+HaloDiary runs a household's recurring services (cleaning twice a week, tutoring three times a week, dog walking on weekends, pool care twice a month, car servicing every quarter) like subscriptions on one diary. The client approves one monthly budget with PayPal. The day before each visit, both sides get a check: proceed, move it, or skip it. Payment is held when a visit is confirmed, charged only after it is done, and the provider is paid out through PayPal. A context-aware AI assistant can search, book, reschedule, answer checks and explain spending, and it asks before it changes anything. It can be switched off, and the app keeps working without it.
+
+Built for the PayPal AI Hackathon (Devpost, November 2026).
+
+## What judges can try
+
+1. Open the live demo and press **Try it instantly** (or create an account).
+2. Allow location, or pick a city. Every judge sees a full marketplace of providers with ratings and reviews around wherever they are.
+3. In **Discover**, pick a service and provider, choose a cadence and add it to the diary. Or open the assistant and type a routine, for example *"cleaning twice a week and a dog walker on weekends under €20 a walk"*.
+4. In **Budget**, approve the month with PayPal (sandbox) or with the simulated button.
+5. On the **Diary**, use the **demo clock** (+1 day) to watch day-before checks arrive. Proceed, move, or skip a visit.
+6. Open **Provider view** to answer as the provider, propose a new time, or mark a visit done. The ledger shows the hold, the charge and the provider payout with PayPal references.
+7. **Activity** shows every action and who took it: you, the assistant, or the scheduler.
+
+## How PayPal is used
+
+| Step | PayPal capability |
+| --- | --- |
+| Monthly budget approval | Vault: setup token, payer approval on PayPal, payment token (`/v3/vault/setup-tokens`, `/v3/vault/payment-tokens`) |
+| Visit confirmed (day before) | Orders v2 with the vaulted PayPal account, intent `AUTHORIZE` |
+| Visit done | Capture the authorization (`/v2/payments/authorizations/{id}/capture`) |
+| Visit skipped or moved | Void the authorization |
+| Provider paid | Payouts API (`/v1/payments/payouts`), minus a 10% platform fee |
+
+Without PayPal keys the app runs in a clearly labelled **simulated** mode, so the demo never breaks.
+
+## How AI is used
+
+The assistant (`src/app/api/assistant`, `src/lib/assistant`) uses Claude through the Vercel AI SDK with tool calling:
+
+- **Context aware:** every request carries a fresh snapshot: role, current page, schedule, visits waiting for an answer, budget and spend, recent activity, and the user's assistant settings.
+- **Bounded autonomy:** read tools (search providers, diary, budget, payments) run straight away. Tools that change the diary or money (`add_recurring_service`, `answer_visit`, `change_service_status`, `approve_budget`, `answer_as_provider`) pause for a one-tap approval card in the chat.
+- **On and off:** a switch in the panel and in Settings, plus finer switches for proactive suggestions and for letting the assistant answer routine day-before checks. The scheduler and payments are ordinary code, so everything keeps running with the assistant off.
+- **Scoped by role:** a provider's assistant never sees a client's budget or PayPal details.
+- **Memory:** the last 40 messages are kept per user so the assistant can pick up where you left off.
+
+## Stack
+
+Next.js 15 (App Router, TypeScript, Tailwind 4), Supabase (Postgres, Auth, row level security), PayPal REST APIs (sandbox), and the Vercel AI SDK 7 with Anthropic Claude.
+
+## Run it yourself
+
+### 1. Supabase
+
+1. Create a project at [supabase.com](https://supabase.com).
+2. In **SQL Editor**, run `supabase/migrations/0001_schema.sql`, then `supabase/seed.sql`.
+3. In **Authentication > Sign In / Providers > Email**, turn **Confirm email** off, so the one-click demo account works.
+4. Copy the project URL and publishable (anon) key from **Project Settings > API**.
+
+The seed holds 22 services, 87 demo providers and 340 reviews. Demo providers are stored as offsets in kilometres, so they appear around whoever signs in, anywhere in the world. Regenerate with `node scripts/generate-seed.mjs`.
+
+### 2. PayPal sandbox (optional)
+
+1. At [developer.paypal.com](https://developer.paypal.com), create a sandbox app and copy its client ID and secret.
+2. Enable **Vault** and **Payouts** for the app if they are not already on.
+3. Use a sandbox personal account to log in when approving a budget, and set `PAYPAL_PAYOUT_RECEIVER` to a sandbox email that should receive provider payouts.
+
+### 3. Environment
+
+Copy `.env.example` to `.env.local` and fill it in. Then:
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 4. Deploy
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Push to GitHub and import the repo in [Vercel](https://vercel.com) (free tier). Add the same environment variables, and set `NEXT_PUBLIC_SITE_URL` to the deployed URL so PayPal returns to the right place.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Project layout
 
-## Learn More
+```
+supabase/migrations/0001_schema.sql   tables, security rules, providers_near()
+supabase/seed.sql                     services, demo providers, reviews (generated)
+src/lib/engine.ts                     scheduler: visits, day-before checks, holds, captures, payouts
+src/lib/paypal.ts                     PayPal sandbox client
+src/lib/cadence.ts, src/lib/time.ts   recurring dates in each user's own time zone
+src/lib/actions-core.ts               operations shared by buttons and the assistant
+src/lib/assistant/                    context snapshot and tools
+src/app/app/                          diary, discover, budget, provider view, activity, settings
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Licence
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+MIT

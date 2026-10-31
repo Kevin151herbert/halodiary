@@ -1,26 +1,101 @@
 @import "tailwindcss";
 
+/*
+  HaloDiary tokens
+  ink    #1D2238  deep indigo, text and primary surfaces
+  paper  #F5F6FA  cool page background
+  halo   #F2B83A  the halo ring: upcoming visits, the one accent
+  sage   #2E8A74  confirmed, paid, done
+  rose   #C8506A  needs your answer
+  mist   #E3E6EF  lines and quiet fills
+  slate  #5D6480  secondary text
+*/
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --ink: #1d2238;
+  --paper: #f5f6fa;
+  --card: #ffffff;
+  --halo: #f2b83a;
+  --halo-soft: #fdf1d6;
+  --sage: #2e8a74;
+  --sage-soft: #dcefe9;
+  --rose: #c8506a;
+  --rose-soft: #f8e1e6;
+  --mist: #e3e6ef;
+  --slate: #5d6480;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-ink: var(--ink);
+  --color-paper: var(--paper);
+  --color-card: var(--card);
+  --color-halo: var(--halo);
+  --color-halo-soft: var(--halo-soft);
+  --color-sage: var(--sage);
+  --color-sage-soft: var(--sage-soft);
+  --color-rose: var(--rose);
+  --color-rose-soft: var(--rose-soft);
+  --color-mist: var(--mist);
+  --color-slate: var(--slate);
+  --font-display: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Atkinson Hyperlegible", ui-sans-serif, system-ui, sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background: var(--paper);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: -0.015em;
+}
+
+:focus-visible {
+  outline: 2px solid var(--halo);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* The halo: a day ring whose arc shows how much of the day is booked. */
+.halo-ring {
+  --fill: 0;
+  background: conic-gradient(var(--halo) calc(var(--fill) * 1turn), var(--mist) 0);
+  border-radius: 9999px;
+  padding: 3px;
+}
+.halo-ring > * {
+  background: var(--card);
+  border-radius: 9999px;
+}
+
+@keyframes halo-in {
+  from {
+    --fill: 0;
+  }
+}
+@property --fill {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+.halo-ring.animate {
+  animation: halo-in 900ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
 }

@@ -1,0 +1,233 @@
+// The assistant's tools. Read tools run straight away; anything that changes the diary or
+// money waits for a one-tap approval in the chat (see APPROVAL below). They call the same
+// code as the app's buttons, under the user's own session and row level security.
+
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { tool } from "ai";
+import { z } from "zod";
+import * as core from "../actions-core";
+import { CADENCE_KEYS, cadenceLabel } from "../cadence";
+import { forecastMonth, monthKey, nowFor, spentInMonth } from "../engine";
+import type { Profile } from "../supabase/server";
+import { fmtShort, monthLabel } from "../time";
+
+const cadenceEnum = z.enum(CADENCE_KEYS as [string, ...string[]]);
+const localTime = z
+  .string()
+  .describe("Wall-clock time in the user's time zone, formatted YYYY-MM-DDTHH:mm, e.g. 2026-11-05T16:30. No time zone suffix.");
+
+export function buildTools(supabase: SupabaseClient, profile: Profile) {
+  const cur = profile.currency;
+  const tz = profile.timezone;
+
+  const readTools = {
+    list_services: tool({
+      description: "List every service in the HaloDiary catalogue with its id, typical price and usual cadence.",
+      inputSchema: z.object({}),
+      execute: async () => {
+        const { data } = await supabase.from("services").select("id, name, category, default_cadence, typical_price").order("sort_order");
+        return (data ?? []).map((s) => ({ ...s, usual: cadenceLabel(s.default_cadence) }));
+      },
+    }),
+
+    search_providers: tool({
+      description:
+        "Find service providers near the user, nearest first. Use the service id from list_services (e.g. 'cleaning', 'dog-walking'). Returns up to 5 options with provider_id, price, rating and distance.",
+      inputSchema: z.object({
+        service: z.string().describe("Service id, e.g. 'tutoring'"),
+        max_price: z.number().optional().describe(`Highest price per visit in ${cur}`),
+        min_rating: z.number().min(1).max(5).optional(),
+        sort: z.enum(["distance", "rating", "price"]).optional(),
+        radius_km: z.number().min(1).max(50).optional(),
+      }),
+      execute: async ({ service, max_price, min_rating, sort, radius_km }) => {
+        const { error, results } = await core.searchProviders(supabase, profile, {
+          service,
+          maxPrice: max_price ?? null,
+          minRating: min_rating ?? null,
+          radiusKm: radius_km ?? 12,
+        });
+        if (error) return { error };
+        const sorted = [...results].sort((a, b) =>
+          sort === "rating" ? Number(b.rating) - Number(a.rating) : sort === "price" ? Number(a.price) - Number(b.price) : a.distance_km - b.distance_km,
+        );
+        return sorted.slice(0, 5).map((r) => ({
+          provider_id: r.provider_id,
+          name: r.display_name,
+          service_id: r.service_id,
+          headline: r.headline,
+          price: `${cur} ${Number(r.price).toFixed(2)}`,
+          rating: Number(r.rating),
+          reviews: r.review_count,
+          distance_km: r.distance_km,
+          replies_within_hours: r.responds_within_hours,
+        }));
+      },
+    }),
+
+    get_diary: tool({
+      description: "The user's upcoming visits with ids, times, status and price.",
+      inputSchema: z.object({ days: z.number().min(1).max(30).optional() }),
+      execute: async ({ days }) => {
+        const visits = await core.upcomingVisits(supabase, profile, days ?? 14);
+        return visits.map((v) => ({
+          visit_id: v.id,
+          when: fmtShort(v.scheduled_at, tz),
+          service: v.services?.name,
+          provider: v.providers?.display_name,
+          price: `${cur} ${Number(v.price).toFixed(2)}`,
+          status: v.status,
+          needs_client_answer: v.status === "awaiting" && !v.client_response,
+        }));
+      },
+    }),
+
+    get_budget: tool({
+      description: "Forecast, approved cap and money used for this month or next month, with a per-service breakdown.",
+      inputSchema: z.object({ month: z.enum(["this", "next"]) }),
+      execute: async ({ month }) => {
+        const key = monthKey(nowFor(profile), tz, month === "next" ? 1 : 0);
+        const f = await forecastMonth(supabase, profile, key);
+        const { data: b } = await supabase.from("budgets").select("*").eq("client_id", profile.id).eq("month", key).maybeSingle();
+        const used = await spentInMonth(supabase, profile, key);
+        return {
+          month: monthLabel(key),
+          lines: f.lines.map((l) => ({ service: l.service, provider: l.provider, visits: l.visits, each: l.price, total: l.total })),
+          forecast_total: f.total,
+          suggested_cap: f.cap,
+          approved: b?.status === "approved",
+          approved_cap: b ? Number(b.cap) : null,
+          used,
+          currency: cur,
+        };
+      },
+    }),
+
+    get_payments: tool({
+      description: "Recent payment events: holds, charges, releases and provider payouts, with PayPal references.",
+      inputSchema: z.object({ limit: z.number().min(1).max(50).optional() }),
+      execute: async ({ limit }) => {
+        const { data } = await supabase
+          .from("ledger_entries")
+          .select("kind, amount, paypal_ref, mode, created_at, providers(display_name), visits(services(name))")
+          .eq("client_id", profile.id)
+          .order("created_at", { ascending: false })
+          .limit(limit ?? 15);
+        return (data ?? []).map((e) => ({
+          when: fmtShort(e.created_at, tz),
+          kind: e.kind,
+          amount: `${cur} ${Number(e.amount).toFixed(2)}`,
+          provider: (e.providers as unknown as { display_name: string })?.display_name,
+          service: (e.visits as unknown as { services: { name: string } })?.services?.name,
+          paypal_ref: e.paypal_ref,
+          mode: e.mode,
+        }));
+      },
+    }),
+  };
+
+  const clientActions = {
+    add_recurring_service: tool({
+      description:
+        "Add a recurring service to the diary with a specific provider. Needs the user's approval. Weekdays use 0=Sunday..6=Saturday and apply to weekly-style cadences.",
+      inputSchema: z.object({
+        provider_id: z.string(),
+        provider_name: z.string().describe("For the approval card"),
+        service_id: z.string(),
+        service_name: z.string().describe("For the approval card"),
+        cadence: cadenceEnum,
+        weekdays: z.array(z.number().int().min(0).max(6)).optional(),
+        time: z.string().regex(/^\d{2}:\d{2}$/).optional().describe("HH:mm local time, default 10:00"),
+        price_per_visit: z.string().describe(`Price shown to the user, e.g. '${cur} 35.00'`),
+      }),
+      execute: async (i) => {
+        const res = await core.createPlan(
+          supabase,
+          profile,
+          { providerId: i.provider_id, serviceId: i.service_id, cadence: i.cadence, weekdays: i.weekdays, time: i.time },
+          "assistant",
+        );
+        return "error" in res && res.error ? { error: res.error } : { ok: true, added: res.summary };
+      },
+    }),
+
+    answer_visit: tool({
+      description:
+        "Answer a visit as the client: proceed, skip (nothing charged), or reschedule to a new time. Needs the user's approval.",
+      inputSchema: z.object({
+        visit_id: z.string(),
+        summary: z.string().describe("Plain description for the approval card, e.g. 'Move Thursday cleaning to Friday 10:00'"),
+        action: z.enum(["proceed", "skip", "reschedule"]),
+        new_time: localTime.optional(),
+      }),
+      execute: async ({ visit_id, action, new_time }) =>
+        core.clientRespond(supabase, profile, { visitId: visit_id, action, newTime: new_time }, "assistant"),
+    }),
+
+    change_service_status: tool({
+      description: "Pause, resume or end a recurring service (plan). Needs the user's approval.",
+      inputSchema: z.object({
+        plan_id: z.string(),
+        summary: z.string().describe("For the approval card, e.g. 'Pause pool cleaning'"),
+        status: z.enum(["active", "paused", "ended"]),
+      }),
+      execute: async ({ plan_id, status }) => core.setPlanStatus(supabase, profile, plan_id, status, "assistant"),
+    }),
+
+    approve_budget: tool({
+      description:
+        "Approve a monthly budget cap without PayPal (simulated). Only use when the PayPal sandbox is not configured; otherwise tell the user to approve with PayPal on the Budget page, because money approvals must go through PayPal. Needs the user's approval.",
+      inputSchema: z.object({ month: z.enum(["this", "next"]), cap: z.number().positive(), summary: z.string() }),
+      execute: async ({ month, cap }) => {
+        const key = monthKey(nowFor(profile), tz, month === "next" ? 1 : 0);
+        return core.approveBudget(supabase, profile, { month: key, cap, mode: "simulated" }, "assistant");
+      },
+    }),
+
+    update_assistant_settings: tool({
+      description: "Turn proactive suggestions or auto-answering of routine day-before checks on or off. Needs the user's approval.",
+      inputSchema: z.object({ proactive: z.boolean().optional(), auto_checks: z.boolean().optional(), summary: z.string() }),
+      execute: async ({ proactive, auto_checks }) => {
+        const patch: Record<string, boolean> = {};
+        if (proactive != null) patch.proactive_enabled = proactive;
+        if (auto_checks != null) patch.auto_checks_enabled = auto_checks;
+        await supabase.from("profiles").update(patch).eq("id", profile.id);
+        return { ok: true, ...patch };
+      },
+    }),
+  };
+
+  // Providers (and clients answering for their demo providers in the provider view).
+  const providerActions = {
+    answer_as_provider: tool({
+      description:
+        "Answer a visit as the provider: confirm it, propose a new time to the client, or mark it done so payment is released. Needs the user's approval.",
+      inputSchema: z.object({
+        visit_id: z.string(),
+        summary: z.string(),
+        action: z.enum(["proceed", "propose", "complete"]),
+        new_time: localTime.optional(),
+      }),
+      execute: async ({ visit_id, action, new_time }) =>
+        core.providerRespond(supabase, profile, { visitId: visit_id, action, newTime: new_time }, "assistant"),
+    }),
+  };
+
+  if (profile.role === "provider") {
+    // A provider's own visits are in the context snapshot; client data stays out of reach.
+    return { tools: { list_services: readTools.list_services, ...providerActions }, approval: ["answer_as_provider"] };
+  }
+  return {
+    tools: { ...readTools, ...clientActions, ...providerActions },
+    approval: [...Object.keys(clientActions), ...Object.keys(providerActions)],
+  };
+}
+
+export const PAYPAL_NOTE = (configured: boolean, hasToken: boolean) =>
+  configured
+    ? hasToken
+      ? "PayPal sandbox is connected and the user has saved their PayPal account; holds and charges go through PayPal."
+      : "PayPal sandbox is configured but the user hasn't approved a budget with PayPal yet; send them to the Budget page's 'Approve with PayPal' button."
+    : "PayPal sandbox keys are not set on this deployment, so payments are simulated and clearly labelled as such.";
+
+export const fmtNow = (profile: Profile) => fmtShort(nowFor(profile), profile.timezone);
