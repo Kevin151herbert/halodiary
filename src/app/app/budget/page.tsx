@@ -120,6 +120,14 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
                 {money(used, p.currency)} held or paid, {money(Math.max(0, cap - used), p.currency)} left
               </p>
               {p.paypal_payer_email && <p className="mt-auto pt-6 text-xs text-slate">Paying with PayPal account {p.paypal_payer_email}</p>}
+              {realPayPal && !p.paypal_payment_token && (
+                <form action="/api/paypal/start" method="post" className="mt-auto pt-6">
+                  <input type="hidden" name="month" value={month} />
+                  <input type="hidden" name="cap" value={cap} />
+                  <p className="mb-2 text-xs text-slate">This month was approved without PayPal. Switch to real PayPal sandbox payments:</p>
+                  <button className="w-full rounded-full bg-[#ffc439] px-5 py-2.5 text-sm font-bold text-[#003087] hover:brightness-95">Switch to PayPal</button>
+                </form>
+              )}
             </>
           ) : (
             <>
