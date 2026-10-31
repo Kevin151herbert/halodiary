@@ -286,14 +286,14 @@ export async function advance(supabase: SupabaseClient, profile: Profile) {
   const now = nowFor(profile);
   const windowEnd = new Date(now.getTime() + CHECK_WINDOW_HOURS * 3_600_000);
 
-  // 1. Day-before checks go out.
+  // 1. Day-before checks go out. When the demo clock jumps several days, visits inside the
+  //    jump get their check too (with no answer), so they go ahead exactly as they would have.
   const { data: due } = await supabase
     .from("visits")
     .select(VISIT_SELECT)
     .eq("client_id", profile.id)
     .eq("status", "scheduled")
     .lte("scheduled_at", windowEnd.toISOString())
-    .gt("scheduled_at", now.toISOString())
     .order("scheduled_at");
   for (const v of (due ?? []) as VisitRow[]) {
     const at = new Date(v.scheduled_at);
@@ -308,7 +308,7 @@ export async function advance(supabase: SupabaseClient, profile: Profile) {
         client_response: auto ? "proceed" : v.client_response,
       })
       .eq("id", v.id);
-    await notify(
+    if (at > now) await notify(
       supabase,
       profile.id,
       "day_before_check",
@@ -354,7 +354,8 @@ export async function advance(supabase: SupabaseClient, profile: Profile) {
     if (v.provider_response === "done" || now.getTime() >= end + grace) await completeVisit(supabase, profile, v);
   }
 
-  // 4. Anything still unanswered after its time has passed is skipped at no charge.
+  // 4. Visits that could not be confirmed in time (no approved budget, or a real provider who
+  //    never confirmed) are skipped at no charge once their time has passed.
   await supabase
     .from("visits")
     .update({ status: "skipped" })

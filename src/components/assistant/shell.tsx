@@ -300,12 +300,13 @@ export function AssistantShell({
       {!open && (
         <button
           onClick={() => setOpen(true)}
-          className={`fixed bottom-20 right-4 z-30 inline-flex items-center gap-2 rounded-full px-5 py-3 text-sm font-bold shadow-lg md:bottom-6 md:right-6 ${
+          aria-label={enabled ? "Ask HaloDiary" : "Assistant off"}
+          className={`fixed bottom-20 right-4 z-30 inline-flex items-center gap-2 rounded-full p-3.5 text-sm font-bold shadow-lg md:bottom-6 md:right-6 md:px-5 md:py-3 ${
             enabled ? "bg-ink text-white" : "border border-mist bg-card text-slate"
           }`}
         >
-          <Sparkles size={16} className={enabled ? "text-halo" : ""} aria-hidden />
-          {enabled ? "Ask HaloDiary" : "Assistant off"}
+          <Sparkles size={18} className={enabled ? "text-halo" : ""} aria-hidden />
+          <span className="hidden md:inline">{enabled ? "Ask HaloDiary" : "Assistant off"}</span>
         </button>
       )}
 

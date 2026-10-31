@@ -25,7 +25,7 @@ export async function searchProviders(
   let rows = (data ?? []) as NearRow[];
   if (opts.maxPrice != null) rows = rows.filter((r) => Number(r.price) <= opts.maxPrice!);
   if (opts.minRating != null) rows = rows.filter((r) => Number(r.rating) >= opts.minRating!);
-  return { error: null, results: rows.slice(0, opts.limit ?? 50) };
+  return { error: null, results: opts.limit ? rows.slice(0, opts.limit) : rows };
 }
 
 export type NearRow = {
