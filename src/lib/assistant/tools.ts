@@ -132,7 +132,7 @@ export function buildTools(supabase: SupabaseClient, profile: Profile) {
         "Add a recurring service to the diary with a specific provider. Needs the user's approval. Weekdays use 0=Sunday..6=Saturday and apply to weekly-style cadences.",
       inputSchema: z.object({
         provider_id: z.string(),
-        provider_name: z.string().describe("For the approval card"),
+        provider_name: z.string().describe("For the approval card: copy the name exactly, character for character, as search_providers returned it"),
         service_id: z.string(),
         service_name: z.string().describe("For the approval card"),
         cadence: cadenceEnum,
