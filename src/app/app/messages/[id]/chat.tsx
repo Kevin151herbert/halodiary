@@ -112,15 +112,37 @@ export function Chat({ conversationId, initial, as, otherName, isDemo, currency,
     }
   };
 
-  const send = (body: string, kind: "text" | "extra_request" = "text", visitId?: string | null) =>
+  const send = (body: string, kind: "text" | "extra_request" = "text", visitId?: string | null) => {
+    // Show the message straight away; swap in the saved copy when the server answers.
+    const tempId = `temp-${Date.now()}`;
+    merge([
+      {
+        id: tempId,
+        conversation_id: conversationId,
+        sender: as,
+        kind,
+        body,
+        amount: null,
+        status: kind === "extra_request" ? "open" : null,
+        visit_id: visitId ?? null,
+        reply_to: null,
+        meta: { sending: true },
+        created_at: new Date().toISOString(),
+      },
+    ]);
+    setText("");
+    setPanel(null);
     start(async () => {
       const res = await sendChatAction(conversationId, body, kind, visitId);
-      if (fail(res)) return;
+      setMessages((cur) => cur.filter((m) => m.id !== tempId));
+      if (fail(res)) {
+        setText(body);
+        return;
+      }
       if (res && "message" in res && res.message) merge([res.message]);
-      setText("");
-      setPanel(null);
       await afterClientMessage();
     });
+  };
 
   return (
     <div className="flex flex-col">

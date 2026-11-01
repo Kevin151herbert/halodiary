@@ -12,10 +12,9 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
   const { id } = await params;
   const { supabase, profile } = await getSession();
   const p = profile!;
-  const conv = await getConversation(supabase, id);
+  const [conv, messages] = await Promise.all([getConversation(supabase, id), listMessages(supabase, id)]);
   if (!conv) notFound();
   const as = p.role === "provider" ? "provider" : "client";
-  const messages = await listMessages(supabase, id);
 
   const { data: visits } = await supabase
     .from("visits")

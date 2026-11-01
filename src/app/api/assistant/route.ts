@@ -38,6 +38,7 @@ What you know about this user right now:
 ${context}`;
 
   const result = streamText({
+    abortSignal: AbortSignal.timeout(55_000),
     model: anthropic(process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5"),
     instructions,
     messages: await convertToModelMessages(messages),

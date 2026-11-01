@@ -3,7 +3,7 @@
 import { AllCommunityModule, type ColDef, ModuleRegistry, themeQuartz } from "ag-grid-community";
 import { AgGridReact } from "ag-grid-react";
 import { Download, Search } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { btn, field } from "./ui";
 
 ModuleRegistry.registerModules([AllCommunityModule]);
@@ -43,6 +43,12 @@ const theme = themeQuartz.withParams({
 export function LedgerGrid({ rows, currency, fileName, partyLabel = "Provider" }: { rows: LedgerRow[]; currency: string; fileName: string; partyLabel?: string }) {
   const grid = useRef<AgGridReact<LedgerRow>>(null);
   const [q, setQ] = useState("");
+  // Filter 200 ms after typing stops, not on every key.
+  const [filter, setFilter] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setFilter(q), 200);
+    return () => clearTimeout(t);
+  }, [q]);
   const money = useMemo(() => new Intl.NumberFormat("en-GB", { style: "currency", currency }), [currency]);
   const cols = useMemo<ColDef<LedgerRow>[]>(
     () => [
@@ -91,7 +97,7 @@ export function LedgerGrid({ rows, currency, fileName, partyLabel = "Provider" }
           rowData={rows}
           columnDefs={cols}
           defaultColDef={{ sortable: true, resizable: true }}
-          quickFilterText={q}
+          quickFilterText={filter}
           pagination={rows.length > 25}
           paginationPageSize={25}
           paginationPageSizeSelector={false}

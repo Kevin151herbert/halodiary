@@ -448,6 +448,27 @@ export async function releaseHold(supabase: SupabaseClient, profile: Profile, v:
 }
 
 /** Move every visit forward through its life cycle based on the (demo) clock. */
+// When the app last ran the scheduler for each user (per server instance), keyed with the demo clock so a
+// clock jump always runs it. Every action that changes visits calls advance() itself, and the Render cron
+// covers everyone in the background, so page loads only need it when it is a little stale.
+const lastAdvance = new Map<string, number>();
+const ADVANCE_EVERY_MS = 60_000;
+
+/** advance(), skipped when it already ran for this user and demo clock in the last minute. */
+export async function advanceIfStale(supabase: SupabaseClient, profile: Profile) {
+  if (profile.role !== "client") return;
+  const key = `${profile.id}:${profile.clock_offset_hours}`;
+  const last = lastAdvance.get(key) ?? 0;
+  if (Date.now() - last < ADVANCE_EVERY_MS) return;
+  lastAdvance.set(key, Date.now());
+  try {
+    await advance(supabase, profile);
+  } catch (e) {
+    lastAdvance.delete(key);
+    throw e;
+  }
+}
+
 export async function advance(supabase: SupabaseClient, profile: Profile) {
   if (profile.role !== "client") return;
   const fmtDay = (d: Date) => fmtDayZ(d, profile.timezone);

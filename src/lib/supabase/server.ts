@@ -1,5 +1,6 @@
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { cache } from "react";
 import { supabaseKey, supabaseUrl } from "./env";
 
 export async function createClient() {
@@ -20,16 +21,20 @@ export async function createClient() {
   });
 }
 
-/** The signed-in user and their profile, or nulls. */
-export async function getSession() {
+/**
+ * The signed-in user and their profile, or nulls. Cached per request, so the layout and the page share one
+ * lookup. getClaims() verifies the session token locally against the project's signing keys instead of a
+ * round trip to Supabase Auth on every render.
+ */
+export const getSession = cache(async () => {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return { supabase, user: null, profile: null };
+  const { data } = await supabase.auth.getClaims();
+  const claims = data?.claims;
+  if (!claims?.sub) return { supabase, user: null, profile: null };
+  const user = { id: claims.sub, email: (claims.email as string | undefined) ?? null };
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single();
   return { supabase, user, profile: profile as Profile | null };
-}
+});
 
 export type Profile = {
   id: string;

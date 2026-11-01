@@ -310,6 +310,7 @@ export async function demoReply(supabase: SupabaseClient, profile: Profile, conv
   if (process.env.ANTHROPIC_API_KEY) {
     try {
       const { object } = await generateObject({
+        abortSignal: AbortSignal.timeout(20_000),
         model: anthropic(process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5"),
         schema: replySchema,
         instructions: `You are ${name}, a home-services provider on HaloDiary (${conv.providers.headline}). You are chatting with your client ${profile.full_name || "your client"} inside the HaloDiary app.

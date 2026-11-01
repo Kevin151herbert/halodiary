@@ -29,6 +29,7 @@ export async function accessToken() {
   if (cached && cached.expires > Date.now() + 60_000) return cached.token;
   const auth = Buffer.from(`${process.env.PAYPAL_CLIENT_ID}:${process.env.PAYPAL_CLIENT_SECRET}`).toString("base64");
   const res = await fetch(`${BASE}/v1/oauth2/token`, {
+    signal: AbortSignal.timeout(15_000),
     method: "POST",
     headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/x-www-form-urlencoded" },
     body: "grant_type=client_credentials",
@@ -43,6 +44,7 @@ export async function accessToken() {
 async function call<T>(path: string, body?: unknown, method = "POST"): Promise<T> {
   const token = await accessToken();
   const res = await fetch(`${BASE}${path}`, {
+    signal: AbortSignal.timeout(15_000),
     method,
     headers: {
       Authorization: `Bearer ${token}`,
@@ -264,6 +266,7 @@ export async function browserClientToken(host: string) {
   const params = new URLSearchParams({ grant_type: "client_credentials", response_type: "client_token", intent: "sdk_init" });
   params.append("domains[]", host.replace(/:\d+$/, ""));
   const res = await fetch(`${BASE}/v1/oauth2/token`, {
+    signal: AbortSignal.timeout(15_000),
     method: "POST",
     headers: { Authorization: `Basic ${auth}`, "Content-Type": "application/x-www-form-urlencoded" },
     body: params.toString(),

@@ -1,7 +1,7 @@
 import { CalendarHeart, Star, Wallet } from "lucide-react";
 import Link from "next/link";
 import { AttendanceCard } from "@/components/attendance";
-import { LedgerGrid } from "@/components/ledger-grid";
+import { LedgerGrid } from "@/components/ledger-grid-lazy";
 import { Avatar, IconChip, Meter, money, Rating, RingGauge } from "@/components/ui";
 import { attendanceFor } from "@/lib/attendance";
 import { cadenceLabel } from "@/lib/cadence";
@@ -11,7 +11,7 @@ import { getSession } from "@/lib/supabase/server";
 import { dayKey, fmt, fmtDay, monthKey, monthRange } from "@/lib/time";
 import { NewClientActions, SampleClientsButton } from "./dashboard-controls";
 import { ScheduleCalendar } from "./schedule-calendar";
-import { WeekPlanner } from "@/components/week-planner";
+import { WeekPlanner } from "@/components/week-planner-lazy";
 
 /** A real provider's home: schedule, new client requests, ratings and attendance. */
 export async function ProviderDashboard({ providerId }: { providerId: string }) {

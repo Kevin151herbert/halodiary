@@ -22,9 +22,10 @@ export async function middleware(request: NextRequest) {
     },
   });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // getClaims refreshes an expired session and verifies the token locally (asymmetric signing keys),
+  // so most requests make no call to Supabase Auth.
+  const { data } = await supabase.auth.getClaims();
+  const user = data?.claims?.sub ? { id: data.claims.sub } : null;
 
   const path = request.nextUrl.pathname;
   if (!user && (path.startsWith("/app") || path.startsWith("/onboarding"))) {

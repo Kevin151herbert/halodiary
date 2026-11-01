@@ -67,6 +67,7 @@ export async function reportProblem(
   if (process.env.ANTHROPIC_API_KEY) {
     try {
       const { text } = await generateText({
+        abortSignal: AbortSignal.timeout(20_000),
         model: model(),
         instructions:
           "Summarise a client's complaint about a home-service visit for the provider, in two neutral, factual sentences. Say what went wrong and what the client wants, without blame or emotion. Never use em dashes.",
@@ -109,6 +110,7 @@ export async function demoRespondToProblem(supabase: SupabaseClient, profile: Pr
   if (process.env.ANTHROPIC_API_KEY) {
     try {
       const { object } = await generateObject({
+        abortSignal: AbortSignal.timeout(20_000),
         model: model(),
         schema: z.object({ reply: z.string(), refund_pct: z.number().min(0).max(100) }),
         instructions: `You are ${conv.providers.display_name}, a professional home-service provider replying in the HaloDiary chat to a complaint. Apologise briefly and concretely, say what you'll do differently, and propose a fair refund percentage of the visit price (no-show 100, unfinished 40 to 60, quality 20 to 40, minor lateness 10 to 20). Two sentences. Never use em dashes. Never suggest moving off HaloDiary.`,

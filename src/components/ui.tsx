@@ -23,6 +23,8 @@ export function Avatar({ name, hue, size = 44, photo }: { name: string; hue: num
       <img
         src={photo}
         alt=""
+        loading="lazy"
+        decoding="async"
         width={size}
         height={size}
         className="shrink-0 rounded-full object-cover"

@@ -17,18 +17,15 @@ export default async function ProviderPage({ params, searchParams }: { params: P
   const { service } = await searchParams;
   const { supabase, profile } = await getSession();
 
-  const { data: provider } = await supabase.from("providers").select("*").eq("id", id).maybeSingle();
+  const [{ data: provider }, { data: offers }, { data: reviews }, near, attendance] = await Promise.all([
+    supabase.from("providers").select("*").eq("id", id).maybeSingle(),
+    supabase.from("provider_services").select("price, services(*)").eq("provider_id", id),
+    supabase.from("reviews").select("*").eq("provider_id", id).order("created_at", { ascending: false }).limit(6),
+    searchProviders(supabase, profile!, { radiusKm: 50 }),
+    attendanceFor(supabase, id, nowFor(profile!).toISOString()),
+  ]);
   if (!provider) notFound();
-  const { data: offers } = await supabase.from("provider_services").select("price, services(*)").eq("provider_id", id);
-  const { data: reviews } = await supabase
-    .from("reviews")
-    .select("*")
-    .eq("provider_id", id)
-    .order("created_at", { ascending: false })
-    .limit(6);
-  const near = await searchProviders(supabase, profile!, { radiusKm: 50 });
   const completeness = profileCompleteness({ ...provider, socials: provider.socials ?? {}, team: provider.team ?? [] });
-  const attendance = await attendanceFor(supabase, id, nowFor(profile!).toISOString());
   const distance = near.results.find((r) => r.provider_id === id)?.distance_km;
 
   type Offer = { price: number; services: { id: string; name: string; default_cadence: string } };

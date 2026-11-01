@@ -1,4 +1,4 @@
-import { WeekPlanner } from "@/components/week-planner";
+import { WeekPlanner } from "@/components/week-planner-lazy";
 import Link from "next/link";
 import { Avatar, ButtonLink, Card, Halo, money, StatusPill } from "@/components/ui";
 import { cadenceLabel } from "@/lib/cadence";
@@ -22,44 +22,30 @@ export default async function DiaryPage({ searchParams }: { searchParams: Promis
   const fmtDay = (d: Date) => fmtDayZ(d, tz);
   const fmtTime = (d: Date) => fmtTimeZ(d, tz);
 
-  const visits = await upcomingVisits(supabase, p, 14);
-  const { data: plans } = await supabase
-    .from("plans")
-    .select("*, services(name), providers(id, display_name, avatar_hue)")
-    .eq("client_id", p.id)
-    .neq("status", "ended")
-    .order("created_at");
-  const { count: handled } = await supabase
-    .from("visits")
-    .select("id", { count: "exact", head: true })
-    .eq("client_id", p.id)
-    .in("status", ["confirmed", "completed", "skipped"]);
-  const { data: proposals } = await supabase
-    .from("notifications")
-    .select("*")
-    .eq("user_id", p.id)
-    .eq("kind", "reschedule_request")
-    .is("read_at", null);
-  const { data: recent } = await supabase
-    .from("notifications")
-    .select("*")
-    .eq("user_id", p.id)
-    .neq("kind", "reschedule_request")
-    .order("created_at", { ascending: false })
-    .limit(4);
-  const { data: budget } = await supabase
-    .from("budgets")
-    .select("*")
-    .eq("client_id", p.id)
-    .eq("month", monthKey(now, tz))
-    .maybeSingle();
-  const forecast = await forecastMonth(supabase, p, monthKey(now, tz));
+  // Independent reads run together.
+  const [visits, { data: plans }, { count: handled }, { data: proposals }, { data: recent }, { data: budget }, forecast] = await Promise.all([
+    upcomingVisits(supabase, p, 14),
+    supabase
+      .from("plans")
+      .select("*, services(name), providers(id, display_name, avatar_hue)")
+      .eq("client_id", p.id)
+      .neq("status", "ended")
+      .order("created_at"),
+    supabase.from("visits").select("id", { count: "exact", head: true }).eq("client_id", p.id).in("status", ["confirmed", "completed", "skipped"]),
+    supabase.from("notifications").select("*").eq("user_id", p.id).eq("kind", "reschedule_request").is("read_at", null),
+    supabase.from("notifications").select("*").eq("user_id", p.id).neq("kind", "reschedule_request").order("created_at", { ascending: false }).limit(4),
+    supabase.from("budgets").select("*").eq("client_id", p.id).eq("month", monthKey(now, tz)).maybeSingle(),
+    forecastMonth(supabase, p, monthKey(now, tz)),
+  ]);
 
   const needsAnswer = visits.filter((v) => v.status === "awaiting" && !v.client_response);
   // What skipping or moving each visit would cost right now under its agreement.
   const costs = new Map(
     await Promise.all(
-      needsAnswer.map(async (v) => [v.id, { skip: await changeCost(supabase, p, v, "skip"), move: await changeCost(supabase, p, v, "reschedule") }] as const),
+      needsAnswer.map(async (v) => {
+        const [skip, move] = await Promise.all([changeCost(supabase, p, v, "skip"), changeCost(supabase, p, v, "reschedule")]);
+        return [v.id, { skip, move }] as const;
+      }),
     ),
   );
   const hours = Math.round(((handled ?? 0) * MINUTES_SAVED_PER_VISIT) / 6) / 10;

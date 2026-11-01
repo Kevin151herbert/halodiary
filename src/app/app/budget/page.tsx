@@ -6,7 +6,7 @@ import { fmt, monthLabel } from "@/lib/time";
 import { SimulatedApprove } from "./simulated-approve";
 import { PayPalV6Button } from "./paypal-v6-button";
 import { StatementButton } from "./statement-button";
-import { LedgerGrid } from "@/components/ledger-grid";
+import { LedgerGrid } from "@/components/ledger-grid-lazy";
 
 const LABEL: Record<string, string> = {
   hold: "Held",
@@ -19,6 +19,19 @@ const LABEL: Record<string, string> = {
   extra: "Extra paid in chat",
 };
 
+type LedgerRow = {
+  id: string;
+  kind: string;
+  amount: number;
+  paypal_ref: string | null;
+  mode: string;
+  note: string | null;
+  created_at: string;
+  paypal_confirmed_at: string | null;
+  providers: { display_name: string } | null;
+  visits: { scheduled_at: string; services: { name: string } | null } | null;
+};
+
 export default async function BudgetPage({ searchParams }: { searchParams: Promise<{ m?: string; approved?: string; paypal_error?: string; welcome?: string }> }) {
   const { m, approved, paypal_error, welcome } = await searchParams;
   const { supabase, profile } = await getSession();
@@ -29,21 +42,23 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
   const month = m === "next" ? nextMonth : thisMonth;
   const label = monthLabel(month);
 
-  const raw = await forecastMonth(supabase, p, month);
+  const [raw, { data: budget }, used, { data: ledger }, { data: openCredits }] = await Promise.all([
+    forecastMonth(supabase, p, month),
+    supabase.from("budgets").select("*").eq("client_id", p.id).eq("month", month).maybeSingle(),
+    spentInMonth(supabase, p, month),
+    supabase
+      .from("ledger_entries")
+      .select("id, kind, amount, paypal_ref, mode, note, created_at, paypal_confirmed_at, paypal_status, providers(display_name), visits(scheduled_at, services(name))")
+      .eq("client_id", p.id)
+      .order("created_at", { ascending: false })
+      .limit(500),
+    supabase.from("ledger_entries").select("amount").eq("client_id", p.id).eq("kind", "credit").is("settled_at", null),
+  ]);
   // The budget chosen during setup becomes the suggested cap when it covers the forecast.
   const forecast = { ...raw, cap: p.monthly_budget && Number(p.monthly_budget) >= raw.total ? Number(p.monthly_budget) : raw.cap };
-  const { data: budget } = await supabase.from("budgets").select("*").eq("client_id", p.id).eq("month", month).maybeSingle();
-  const used = await spentInMonth(supabase, p, month);
-  const { data: ledger } = await supabase
-    .from("ledger_entries")
-    .select("*, providers(display_name), visits(scheduled_at, services(name))")
-    .eq("client_id", p.id)
-    .order("created_at", { ascending: false })
-    .limit(500);
 
   const cap = budget ? Number(budget.cap) : forecast.cap;
   const pct = cap ? Math.min(100, (used / cap) * 100) : 0;
-  const { data: openCredits } = await supabase.from("ledger_entries").select("amount").eq("client_id", p.id).eq("kind", "credit").is("settled_at", null);
   const credit = (openCredits ?? []).reduce((s, c) => s + Number(c.amount), 0);
   const realPayPal = paypalConfigured();
 
@@ -217,7 +232,7 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
           <LedgerGrid
             currency={p.currency}
             fileName={`halodiary-ledger-${month.slice(0, 7)}.csv`}
-            rows={(ledger ?? []).map((e) => ({
+            rows={((ledger ?? []) as unknown as LedgerRow[]).map((e) => ({
               id: e.id,
               when: e.created_at,
               whenLabel: fmt(e.created_at, p.timezone, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }),

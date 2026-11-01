@@ -1,4 +1,8 @@
 import type { Metadata } from "next";
+// Fonts are self-hosted from our own domain (no Google Fonts round trip), two weights plus one variable face.
+import "@fontsource/atkinson-hyperlegible/latin-400.css";
+import "@fontsource/atkinson-hyperlegible/latin-700.css";
+import "@fontsource-variable/bricolage-grotesque/wght.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -10,14 +14,6 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&display=swap"
-        />
-      </head>
       <body className="min-h-dvh">{children}</body>
     </html>
   );

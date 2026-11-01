@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { AssistantShell } from "@/components/assistant/shell";
 import { Logo } from "@/components/ui";
 import { unreadCount } from "@/lib/chat";
-import { advance, nowFor } from "@/lib/engine";
+import { advanceIfStale, nowFor } from "@/lib/engine";
 import { getSession } from "@/lib/supabase/server";
 import { fmtShort } from "@/lib/time";
 import { Nav } from "./nav";
@@ -14,15 +14,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (profile.lat == null) redirect(profile.role === "client" ? "/start" : "/onboarding");
 
   // Move visits along the timeline (day-before checks, holds, captures) before rendering.
-  await advance(supabase, profile);
+  await advanceIfStale(supabase, profile);
 
-  const { count: unread } = await supabase
-    .from("notifications")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", profile.id)
-    .is("read_at", null);
-
-  const chats = await unreadCount(supabase, profile);
+  const [{ count: unread }, chats] = await Promise.all([
+    supabase.from("notifications").select("id", { count: "exact", head: true }).eq("user_id", profile.id).is("read_at", null),
+    unreadCount(supabase, profile),
+  ]);
   const now = nowFor(profile);
   const aiConfigured = Boolean(process.env.ANTHROPIC_API_KEY);
 

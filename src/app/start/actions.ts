@@ -40,6 +40,7 @@ export async function welcomeAction() {
   if (!process.env.ANTHROPIC_API_KEY) return { text: fallback, ai: false };
   try {
     const { text } = await generateText({
+      abortSignal: AbortSignal.timeout(20_000),
       model: model(),
       instructions:
         "You are the HaloDiary assistant greeting a new user. HaloDiary runs a household's recurring services (cleaning, tutoring, dog walking, pool care, car servicing and more) like subscriptions: one diary, a check with both sides the day before each visit, signed agreements, in-app chat, and PayPal payments inside a monthly budget approved once. Write 3 short sentences, warm and concrete, in plain words. Mention the time it saves. Never use em dashes. No markdown, no emojis, no lists.",
@@ -65,6 +66,7 @@ export async function parseRoutineAction(text: string, catalog: { id: string; na
   if (process.env.ANTHROPIC_API_KEY) {
     try {
       const { object } = await generateObject({
+        abortSignal: AbortSignal.timeout(20_000),
         model: model(),
         schema: routineSchema,
         instructions: `Map what the user needs to HaloDiary's service catalogue. Catalogue (id: name, usual cadence): ${catalog.map((c) => `${c.id}: ${c.name}, ${c.default_cadence}`).join("; ")}. Cadences: ${CADENCE_KEYS.join(", ")}. Use the usual cadence when they don't say. Only use ids from the catalogue. monthly_budget is the number they mention for a month, else null.`,

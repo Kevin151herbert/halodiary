@@ -20,13 +20,19 @@ const SOCIALS = [
 ] as const;
 
 /** Shrink a photo to a 512px square JPEG in the browser before upload. */
-async function squareJpeg(file: File): Promise<Blob> {
+/** Square-crop to 512px and encode as WebP (about a third the size of JPEG), JPEG where WebP isn't supported. */
+async function squareImage(file: File): Promise<{ blob: Blob; ext: "webp" | "jpg"; type: string }> {
   const img = await createImageBitmap(file);
   const side = Math.min(img.width, img.height);
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = 512;
   canvas.getContext("2d")!.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, 512, 512);
-  return new Promise((res, rej) => canvas.toBlob((b) => (b ? res(b) : rej(new Error("Could not read that image"))), "image/jpeg", 0.85));
+  const encode = (type: string, q: number) => new Promise<Blob | null>((res) => canvas.toBlob(res, type, q));
+  const webp = await encode("image/webp", 0.82);
+  if (webp && webp.type === "image/webp") return { blob: webp, ext: "webp", type: "image/webp" };
+  const jpg = await encode("image/jpeg", 0.85);
+  if (!jpg) throw new Error("Could not read that image");
+  return { blob: jpg, ext: "jpg", type: "image/jpeg" };
 }
 
 export function ProfileEditor({
@@ -61,10 +67,10 @@ export function ProfileEditor({
     setUploading(true);
     setMsg(null);
     try {
-      const blob = await squareJpeg(file);
+      const { blob, ext, type } = await squareImage(file);
       const supabase = createClient();
-      const path = `${profileId}/${Date.now()}.jpg`;
-      const { error } = await supabase.storage.from("avatars").upload(path, blob, { contentType: "image/jpeg", upsert: true });
+      const path = `${profileId}/${Date.now()}.${ext}`;
+      const { error } = await supabase.storage.from("avatars").upload(path, blob, { contentType: type, upsert: true, cacheControl: "31536000" });
       if (error) throw error;
       set("photo_url", supabase.storage.from("avatars").getPublicUrl(path).data.publicUrl);
     } catch (e) {

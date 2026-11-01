@@ -1,0 +1,20 @@
+-- Indexes for the lookups the app makes on every page and in the scheduler.
+create index if not exists plans_client on public.plans (client_id, status);
+create index if not exists plans_provider on public.plans (provider_id, status);
+create index if not exists visits_client_status on public.visits (client_id, status, scheduled_at);
+create index if not exists visits_service on public.visits (service_id);
+create index if not exists notifications_unread on public.notifications (user_id) where read_at is null;
+create index if not exists notifications_visit on public.notifications (visit_id);
+create index if not exists ledger_provider_time on public.ledger_entries (provider_id, created_at desc);
+create index if not exists ledger_visit on public.ledger_entries (visit_id);
+create index if not exists messages_visit on public.messages (visit_id);
+create index if not exists messages_reply_to on public.messages (reply_to);
+create index if not exists reviews_provider_time on public.reviews (provider_id, created_at desc);
+create index if not exists reviews_client on public.reviews (client_id);
+create index if not exists reviews_service on public.reviews (service_id);
+create index if not exists provider_services_service on public.provider_services (service_id);
+create index if not exists problems_visit on public.problems (visit_id);
+create index if not exists problems_conversation on public.problems (conversation_id);
+create index if not exists agent_tokens_user on public.agent_tokens (user_id);
+create index if not exists plans_service on public.plans (service_id);
+create index if not exists service_records_service on public.service_records (service_id);

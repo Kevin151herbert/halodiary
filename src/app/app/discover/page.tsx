@@ -11,8 +11,10 @@ type Search = Promise<{ service?: string; sort?: string }>;
 export default async function DiscoverPage({ searchParams }: { searchParams: Search }) {
   const { service, sort = "distance" } = await searchParams;
   const { supabase, profile } = await getSession();
-  const { data: services } = await supabase.from("services").select("*").order("sort_order");
-  const { results } = await searchProviders(supabase, profile!, { service: service ?? null, radiusKm: 12 });
+  const [{ data: services }, { results }] = await Promise.all([
+    supabase.from("services").select("*").order("sort_order"),
+    searchProviders(supabase, profile!, { service: service ?? null, radiusKm: 12 }),
+  ]);
 
   const sorted = [...results].sort((a, b) =>
     sort === "rating" ? Number(b.rating) - Number(a.rating) || a.distance_km - b.distance_km : sort === "price" ? Number(a.price) - Number(b.price) : a.distance_km - b.distance_km,
