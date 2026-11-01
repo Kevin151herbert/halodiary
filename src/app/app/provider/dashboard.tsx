@@ -1,15 +1,15 @@
 import { CalendarHeart, Star, Wallet } from "lucide-react";
 import Link from "next/link";
 import { AttendanceCard } from "@/components/attendance";
-import { Avatar, IconChip, Meter, money, Rating, RingGauge, StatusPill } from "@/components/ui";
+import { Avatar, IconChip, Meter, money, Rating, RingGauge } from "@/components/ui";
 import { attendanceFor } from "@/lib/attendance";
 import { cadenceLabel } from "@/lib/cadence";
 import { COMMISSION, nowFor, VISIT_SELECT, type VisitRow } from "@/lib/engine";
 import { profileCompleteness } from "@/lib/match-shared";
 import { getSession } from "@/lib/supabase/server";
-import { addDays, dayKey, fmt, fmtDay, fmtTime, localInputValue, zonedTime, zParts } from "@/lib/time";
+import { dayKey, fmt, fmtDay, monthKey, monthRange } from "@/lib/time";
 import { NewClientActions, SampleClientsButton } from "./dashboard-controls";
-import { ProviderVisitActions } from "./provider-actions";
+import { ScheduleCalendar } from "./schedule-calendar";
 
 /** A real provider's home: schedule, new client requests, ratings and attendance. */
 export async function ProviderDashboard({ providerId }: { providerId: string }) {
@@ -26,8 +26,8 @@ export async function ProviderDashboard({ providerId }: { providerId: string }) 
         .from("visits")
         .select(VISIT_SELECT)
         .eq("provider_id", providerId)
-        .gte("scheduled_at", new Date(now.getTime() - 6 * 3_600_000).toISOString())
-        .lte("scheduled_at", new Date(now.getTime() + 14 * 86_400_000).toISOString())
+        .gte("scheduled_at", monthRange(monthKey(now, tz, -1), tz).start.toISOString())
+        .lt("scheduled_at", monthRange(monthKey(now, tz, 1), tz).end.toISOString())
         .not("status", "in", "(cancelled,skipped)")
         .order("scheduled_at"),
       supabase
@@ -43,20 +43,12 @@ export async function ProviderDashboard({ providerId }: { providerId: string }) 
       supabase.from("plans").select("id", { count: "exact", head: true }).eq("provider_id", providerId),
     ]);
   const nameOf = new Map(((names ?? []) as { client_id: string; name: string }[]).map((n) => [n.client_id, n.name]));
-  const visits = (visitsRaw ?? []) as VisitRow[];
+  const all = (visitsRaw ?? []) as VisitRow[];
+  const visits = all.filter((v) => new Date(v.scheduled_at).getTime() >= now.getTime() - 6 * 3_600_000 && new Date(v.scheduled_at).getTime() <= now.getTime() + 14 * 86_400_000);
   const earned = (payouts ?? []).reduce((s, e) => s + Number(e.amount), 0);
   const weekEnd = now.getTime() + 7 * 86_400_000;
   const thisWeek = visits.filter((v) => new Date(v.scheduled_at).getTime() <= weekEnd);
   const comp = profileCompleteness({ ...p, website: p.website ?? null, socials: p.socials ?? {}, team: p.team ?? [] });
-
-  // Group the next 14 days by local day.
-  const today = zParts(now, tz);
-  const days = Array.from({ length: 14 }, (_, i) => {
-    const d = addDays(today.y, today.m, today.d, i);
-    return zonedTime(d.y, d.m, d.d, 12, 0, tz);
-  });
-  const byDay = new Map<string, VisitRow[]>();
-  for (const v of visits) byDay.set(dayKey(new Date(v.scheduled_at), tz), [...(byDay.get(dayKey(new Date(v.scheduled_at), tz)) ?? []), v]);
 
   return (
     <div className="space-y-8">
@@ -139,47 +131,22 @@ export async function ProviderDashboard({ providerId }: { providerId: string }) 
         </section>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
-        <section aria-labelledby="schedule">
-          <h2 id="schedule" className="text-xl font-bold">
-            Your schedule
-          </h2>
-          <div className="mt-3 space-y-5">
-            {days.map((d, i) => {
-              const list = byDay.get(dayKey(d, tz));
-              if (!list?.length) return null;
-              return (
-                <div key={i}>
-                  <h3 className="text-sm font-bold text-slate">{fmtDay(d, tz)}</h3>
-                  <ul className="mt-2 space-y-3">
-                    {list.map((v) => (
-                      <li key={v.id} className="clay-sm p-4">
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                          <span className="w-12 font-display font-bold">{fmtTime(new Date(v.scheduled_at), tz)}</span>
-                          <span className="min-w-0 flex-1">
-                            <span className="font-bold">{v.services?.name}</span>
-                            <span className="text-slate">
-                              {" "}
-                              for {nameOf.get(v.client_id) ?? "a client"}, you receive {money(Number(v.price) * (1 - COMMISSION), me.currency)}
-                            </span>
-                          </span>
-                          <StatusPill status={v.status} />
-                        </div>
-                        <ProviderVisitActions
-                          visitId={v.id}
-                          status={v.status}
-                          suggested={localInputValue(new Date(new Date(v.scheduled_at).getTime() + 86_400_000), tz)}
-                          answered={v.provider_response}
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              );
-            })}
-            {!visits.length && <p className="clay-inset p-5 text-sm text-slate">Nothing booked in the next two weeks.</p>}
-          </div>
-        </section>
+      <div className="grid items-start gap-6 lg:grid-cols-[1.5fr_1fr]">
+        <ScheduleCalendar
+          tz={tz}
+          currency={me.currency}
+          todayKey={dayKey(now, tz)}
+          monthKeys={[monthKey(now, tz, -1), monthKey(now, tz), monthKey(now, tz, 1)]}
+          visits={all.map((v) => ({
+            id: v.id,
+            scheduled_at: v.scheduled_at,
+            status: v.status,
+            service: v.services?.name ?? "Visit",
+            client: nameOf.get(v.client_id) ?? "a client",
+            earn: Math.round(Number(v.price) * (1 - COMMISSION) * 100) / 100,
+            provider_response: v.provider_response,
+          }))}
+        />
 
         <aside className="space-y-6">
           <section className="clay p-6">
