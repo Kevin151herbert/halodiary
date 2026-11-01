@@ -4,7 +4,7 @@ import { Check, Copy, Plug, Trash2 } from "lucide-react";
 import { useState, useTransition } from "react";
 import { createAgentTokenAction, revokeAgentTokenAction } from "../actions";
 
-type TokenRow = { id: string; label: string; token_hint: string; created_at: string; last_used_at: string | null };
+type TokenRow = { id: string; label: string; token_hint: string; used: string };
 
 export function AgentConnections({ tokens, mcpUrl }: { tokens: TokenRow[]; mcpUrl: string }) {
   const [label, setLabel] = useState("Claude Desktop");
@@ -45,7 +45,7 @@ export function AgentConnections({ tokens, mcpUrl }: { tokens: TokenRow[]; mcpUr
             <span className="min-w-0 flex-1">
               <span className="block font-bold">{t.label}</span>
               <span className="block text-xs text-slate">
-                {t.token_hint} · {t.last_used_at ? `last used ${new Date(t.last_used_at).toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}` : "not used yet"}
+                {t.token_hint} · {t.used}
               </span>
             </span>
             <button

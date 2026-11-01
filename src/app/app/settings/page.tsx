@@ -1,6 +1,7 @@
 import { btn } from "@/components/ui";
 import { getSession } from "@/lib/supabase/server";
 import { headers } from "next/headers";
+import { fmt } from "@/lib/time";
 import { DEFAULT_AGENT_LIMIT } from "@/lib/agent-guard";
 import { saveSettingsAction, signOutAction } from "../actions";
 import { AgentConnections } from "./agents";
@@ -103,7 +104,15 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
         <h2 id="agents" className="text-xl font-bold">
           Outside AI assistants
         </h2>
-        <AgentConnections tokens={tokens ?? []} mcpUrl={mcpUrl} />
+        <AgentConnections
+          mcpUrl={mcpUrl}
+          tokens={(tokens ?? []).map((t) => ({
+            id: t.id,
+            label: t.label,
+            token_hint: t.token_hint,
+            used: t.last_used_at ? `last used ${fmt(t.last_used_at, p.timezone, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` : "not used yet",
+          }))}
+        />
       </section>
       <form action={signOutAction} className="mt-10">
         <button className={btn.ghost}>Log out</button>
