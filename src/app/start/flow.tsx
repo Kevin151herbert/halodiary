@@ -7,7 +7,15 @@ import { Avatar, btn, field, IconChip, Logo, RingGauge } from "@/components/ui";
 import { CADENCE_KEYS, CADENCES, type CadenceKey } from "@/lib/cadence";
 import { CITIES } from "@/lib/cities";
 import type { Match, Part } from "@/lib/match";
-import { finishStartAction, matchesAction, parseRoutineAction, saveStartLocation, skipStartAction, welcomeAction } from "./actions";
+import {
+  finishStartAction,
+  matchesAction,
+  parseRoutineAction,
+  providerPreviewAction,
+  saveStartLocation,
+  skipStartAction,
+  welcomeAction,
+} from "./actions";
 
 type Service = { id: string; name: string; category: string; default_cadence: string; typical_price: number };
 type Step = "where" | "welcome" | "services" | "budget" | "matches" | "review";
@@ -50,6 +58,33 @@ export function StartFlow({
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const money = (n: number) => new Intl.NumberFormat("en-GB", { style: "currency", currency, maximumFractionDigits: 0 }).format(n);
+
+  // Keep setup's place across a reload or an accidental navigation, in this tab only.
+  const restored = useRef(false);
+  useEffect(() => {
+    if (restored.current) return;
+    restored.current = true;
+    try {
+      const saved = JSON.parse(sessionStorage.getItem("hd-start") ?? "null");
+      if (saved && saved.v === 1) {
+        if (saved.chosen) setChosen(saved.chosen);
+        if (saved.budget) setBudget(saved.budget);
+        if (saved.matches) setMatches(saved.matches);
+        if (saved.picks) setPicks(saved.picks);
+        if (saved.step && steps.includes(saved.step) && (saved.step !== "matches" || saved.matches)) setStep(saved.step);
+      }
+    } catch {
+      /* storage unavailable: start fresh */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    try {
+      sessionStorage.setItem("hd-start", JSON.stringify({ v: 1, step, chosen, budget, matches, picks }));
+    } catch {
+      /* ignore */
+    }
+  }, [step, chosen, budget, matches, picks]);
 
   const chosenList = services.filter((s) => s.id in chosen);
   const estimate = chosenList.reduce((sum, s) => sum + s.typical_price * (CADENCES[chosen[s.id] as CadenceKey]?.perMonth ?? 1), 0);
@@ -165,6 +200,11 @@ export function StartFlow({
               onBack={() => go("matches")}
               onFinish={(agree) =>
                 start(async () => {
+                  try {
+                    sessionStorage.removeItem("hd-start");
+                  } catch {
+                    /* ignore */
+                  }
                   const res = await finishStartAction({
                     interests: Object.keys(chosen),
                     budget,
@@ -543,6 +583,7 @@ function MatchesStep({
 }) {
   const [active, setActive] = useState(services[0]?.id);
   const [view, setView] = useState<"swipe" | "list">("swipe");
+  const [viewing, setViewing] = useState<Match | null>(null);
   const list = matches[active] ?? [];
   const n = Object.keys(picks).length;
 
@@ -591,7 +632,7 @@ function MatchesStep({
         {list.length === 0 ? (
           <div className="clay p-8 text-center text-slate">No providers for this service within 15 km yet.</div>
         ) : view === "swipe" ? (
-          <Deck key={active} matches={list} picked={picks[active]?.provider_id} onPick={pick} money={money} onList={() => setView("list")} />
+          <Deck key={active} matches={list} picked={picks[active]?.provider_id} onPick={pick} money={money} onList={() => setView("list")} onProfile={setViewing} />
         ) : (
           <ul className="grid gap-4 md:grid-cols-2">
             {list.map((m, i) => (
@@ -611,9 +652,9 @@ function MatchesStep({
                         "Choose"
                       )}
                     </button>
-                    <a href={`/app/providers/${m.provider_id}?service=${m.service_id}`} target="_blank" rel="noreferrer" className={btn.ghost}>
+                    <button type="button" onClick={() => setViewing(m)} className={btn.ghost}>
                       Profile
-                    </a>
+                    </button>
                   </div>
                 </MatchCard>
               </li>
@@ -622,7 +663,145 @@ function MatchesStep({
         )}
       </div>
       <Nav onBack={onBack} onNext={onNext} nextLabel={n ? `Review ${n} choice${n > 1 ? "s" : ""}` : "Choose at least one provider"} disabled={!n} />
+      {viewing && (
+        <ProfileSheet
+          m={viewing}
+          money={money}
+          chosen={picks[viewing.service_id]?.provider_id === viewing.provider_id}
+          onClose={() => setViewing(null)}
+          onPick={() => {
+            pick(viewing);
+            setViewing(null);
+          }}
+        />
+      )}
     </section>
+  );
+}
+
+type Preview = NonNullable<Awaited<ReturnType<typeof providerPreviewAction>>>;
+
+/** The provider's profile as a sheet over the matches, so setup never loses its place. */
+function ProfileSheet({ m, money, chosen, onClose, onPick }: { m: Match; money: (n: number) => string; chosen: boolean; onClose: () => void; onPick: () => void }) {
+  const [p, setP] = useState<Preview | null>(null);
+  const [failed, setFailed] = useState(false);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  useEffect(() => {
+    let live = true;
+    providerPreviewAction(m.provider_id, m.service_id)
+      .then((r) => live && (r ? setP(r) : setFailed(true)))
+      .catch(() => live && setFailed(true));
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && closeRef.current();
+    window.addEventListener("keydown", onKey);
+    document.body.style.overflow = "hidden";
+    return () => {
+      live = false;
+      window.removeEventListener("keydown", onKey);
+      document.body.style.overflow = "";
+    };
+  }, [m.provider_id, m.service_id]);
+  const a = p?.attendance;
+  const pct = (n: number) => (a?.total ? Math.round((n / a.total) * 100) : 0);
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-ink/30 p-0 backdrop-blur-sm sm:items-center sm:p-6" role="dialog" aria-modal="true" aria-label={`${m.display_name}'s profile`} onClick={onClose}>
+      <div className="clay max-h-[92dvh] w-full max-w-xl overflow-y-auto rounded-b-none p-6 sm:rounded-[28px] sm:p-7" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-start gap-4">
+          <Avatar name={m.display_name} hue={m.avatar_hue} size={72} photo={m.photo_url} />
+          <div className="min-w-0 flex-1">
+            <h2 className="font-display text-2xl font-extrabold leading-tight">{m.display_name}</h2>
+            <p className="text-sm text-slate">{m.headline}</p>
+            <p className="mt-1 text-sm">
+              {m.rating.toFixed(1)}★ ({m.review_count}) · {m.distance_km.toFixed(1)} km · {money(m.price)} a visit
+            </p>
+          </div>
+          <button onClick={onClose} className="clay-btn-ghost inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full" aria-label="Close profile">
+            <X size={18} aria-hidden />
+          </button>
+        </div>
+
+        {!p && !failed && <p className="mt-6 text-sm text-slate">Loading profile…</p>}
+        {failed && <p className="mt-6 text-sm text-rose">Couldn&apos;t load the profile. Try again.</p>}
+        {p && (
+          <div className="mt-5 space-y-5 text-sm">
+            {p.bio && <p className="leading-relaxed">{p.bio}</p>}
+            <div className="clay-inset grid grid-cols-3 gap-2 px-3 py-4 text-center">
+              <div>
+                <p className="font-display text-xl font-extrabold text-sage">{pct(a!.rendered)}%</p>
+                <p className="text-[11px] text-slate">rendered</p>
+              </div>
+              <div>
+                <p className="font-display text-xl font-extrabold text-[#b07a10]">{pct(a!.alternative)}%</p>
+                <p className="text-[11px] text-slate">moved</p>
+              </div>
+              <div>
+                <p className="font-display text-xl font-extrabold text-rose">{pct(a!.cancelled)}%</p>
+                <p className="text-[11px] text-slate">cancelled</p>
+              </div>
+            </div>
+            {a!.recentCancellations.length > 0 && <p className="text-xs text-slate">Recent cancellation reasons: {a!.recentCancellations.join("; ")}.</p>}
+            <dl className="grid grid-cols-2 gap-3">
+              <div>
+                <dt className="text-xs font-bold uppercase tracking-wide text-slate">Team</dt>
+                <dd>
+                  {p.team_size > 1 ? `Team of ${p.team_size}` : "Works solo"}
+                  {(p.team as { name: string; role: string }[] | null)?.length ? `: ${(p.team as { name: string; role: string }[]).map((t) => t.name).join(", ")}` : ""}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-bold uppercase tracking-wide text-slate">Trust</dt>
+                <dd>{[p.insured ? "Insured" : "Not insured", p.certifications || null, p.verified ? "ID checked" : null].filter(Boolean).join(" · ")}</dd>
+              </div>
+              <div>
+                <dt className="text-xs font-bold uppercase tracking-wide text-slate">Experience</dt>
+                <dd>
+                  {p.years_experience} years · {(p.languages as string[]).join(", ")}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs font-bold uppercase tracking-wide text-slate">Online</dt>
+                <dd className="break-words">
+                  {Object.entries((p.socials ?? {}) as Record<string, string>).map(([k, v]) => `${k} @${v}`).join(" · ") || "No links shared"}
+                </dd>
+              </div>
+            </dl>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-slate">Services</p>
+              <p className="mt-1">{p.offers.map((o) => `${o.name} ${money(o.price)}`).join(" · ")}</p>
+            </div>
+            {p.reviews.length > 0 && (
+              <ul className="space-y-2">
+                {p.reviews.map((r, i) => (
+                  <li key={i} className="clay-inset px-4 py-3">
+                    <p className="flex justify-between font-bold">
+                      <span>{r.author_name}</span>
+                      <span>{r.rating}★</span>
+                    </p>
+                    <p className="mt-0.5">{r.body}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+        <div className="sticky bottom-0 mt-6 flex gap-2 pt-2">
+          <button onClick={onPick} className={`${chosen ? btn.halo : btn.primary} flex-1`}>
+            {chosen ? (
+              <>
+                <Check size={16} aria-hidden /> Chosen
+              </>
+            ) : (
+              <>
+                <Heart size={16} aria-hidden /> Choose {m.display_name.split(" ")[0]}
+              </>
+            )}
+          </button>
+          <button onClick={onClose} className={btn.ghost}>
+            Back to matches
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -694,7 +873,21 @@ function Stat({ label, value, tone = "" }: { label: string; value: string; tone?
 }
 
 /** Tinder-style deck: drag or tap. Right picks the provider for this service, left passes. */
-function Deck({ matches, picked, onPick, money, onList }: { matches: Match[]; picked?: string; onPick: (m: Match) => void; money: (n: number) => string; onList: () => void }) {
+function Deck({
+  matches,
+  picked,
+  onPick,
+  money,
+  onList,
+  onProfile,
+}: {
+  matches: Match[];
+  picked?: string;
+  onPick: (m: Match) => void;
+  money: (n: number) => string;
+  onList: () => void;
+  onProfile: (m: Match) => void;
+}) {
   const [i, setI] = useState(0);
   const [dx, setDx] = useState(0);
   const [dy, setDy] = useState(0);
@@ -765,10 +958,13 @@ function Deck({ matches, picked, onPick, money, onList }: { matches: Match[]; pi
           }}
           onPointerUp={() => {
             const d = dx;
+            const moved = Math.abs(dx) + Math.abs(dy);
             startPt.current = null;
             if (d > 110) decide(1);
             else if (d < -110) decide(-1);
-            else {
+            else if (moved < 6) {
+              onProfile(m);
+            } else {
               setDx(0);
               setDy(0);
             }
@@ -806,14 +1002,9 @@ function Deck({ matches, picked, onPick, money, onList }: { matches: Match[]; pi
         <button onClick={() => decide(1)} className="clay-btn-halo inline-flex h-16 w-16 items-center justify-center rounded-full" aria-label={`Pick ${m.display_name}`}>
           <Heart size={26} fill="currentColor" aria-hidden />
         </button>
-        <a
-          href={`/app/providers/${m.provider_id}?service=${m.service_id}`}
-          target="_blank"
-          rel="noreferrer"
-          className="clay-btn-ghost inline-flex h-12 items-center justify-center rounded-full px-4 text-xs font-bold"
-        >
+        <button type="button" onClick={() => onProfile(m)} className="clay-btn-ghost inline-flex h-12 items-center justify-center rounded-full px-4 text-xs font-bold">
           Profile
-        </a>
+        </button>
       </div>
       <p className="mt-3 text-center text-xs text-slate">
         Drag right to pick, left to pass, or use the arrow keys. {i + 1} of {matches.length}.

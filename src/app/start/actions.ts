@@ -7,7 +7,8 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import * as core from "@/lib/actions-core";
 import { CADENCE_KEYS, defaultWeekdays, type CadenceKey } from "@/lib/cadence";
-import { log } from "@/lib/engine";
+import { attendanceFor } from "@/lib/attendance";
+import { log, nowFor } from "@/lib/engine";
 import { rankProviders, targets, type Match } from "@/lib/match";
 import { getSession } from "@/lib/supabase/server";
 import { fmt, isValidTz } from "@/lib/time";
@@ -129,3 +130,32 @@ export async function skipStartAction() {
   redirect("/app/discover");
 }
 
+
+/** Everything the profile sheet in the matching step shows, without leaving setup. */
+export async function providerPreviewAction(providerId: string, serviceId: string) {
+  const { supabase, profile } = await session();
+  const [{ data: p }, { data: offers }, { data: reviews }, attendance] = await Promise.all([
+    supabase
+      .from("providers")
+      .select("display_name, headline, bio, avatar_hue, photo_url, years_experience, languages, responds_within_hours, verified, insured, certifications, team, team_size, socials, website, is_demo, service_radius_km, rating, review_count")
+      .eq("id", providerId)
+      .maybeSingle(),
+    supabase.from("provider_services").select("price, services(id, name)").eq("provider_id", providerId),
+    supabase.from("reviews").select("author_name, rating, body").eq("provider_id", providerId).order("created_at", { ascending: false }).limit(4),
+    attendanceFor(supabase, providerId, nowFor(profile).toISOString()),
+  ]);
+  if (!p) return null;
+  return {
+    ...p,
+    serviceId,
+    offers: (offers ?? []).map((o) => ({ name: (o.services as unknown as { name: string })?.name, price: Number(o.price) })),
+    reviews: reviews ?? [],
+    attendance: {
+      total: attendance.total,
+      rendered: attendance.rendered,
+      alternative: attendance.alternative,
+      cancelled: attendance.cancelled,
+      recentCancellations: attendance.items.filter((i) => i.outcome === "cancelled").slice(0, 3).map((i) => i.note),
+    },
+  };
+}
