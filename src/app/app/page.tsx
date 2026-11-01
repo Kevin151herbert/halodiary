@@ -1,3 +1,4 @@
+import { WeekPlanner } from "@/components/week-planner";
 import Link from "next/link";
 import { Avatar, ButtonLink, Card, Halo, money, StatusPill } from "@/components/ui";
 import { cadenceLabel } from "@/lib/cadence";
@@ -190,10 +191,28 @@ export default async function DiaryPage({ searchParams }: { searchParams: Promis
         </section>
       )}
 
-      <section aria-labelledby="upcoming">
+      <section aria-labelledby="upcoming" className="clay p-5 sm:p-6">
         <h2 id="upcoming" className="text-xl font-bold">
           Next two weeks
         </h2>
+        <p className="mb-4 text-sm text-slate">Drag a visit to move it. You see any fee before it changes.</p>
+        <WeekPlanner
+          side="client"
+          tz={tz}
+          currency={currency}
+          nowIso={now.toISOString()}
+          visits={visits.map((v) => ({
+            id: v.id,
+            scheduled_at: v.scheduled_at,
+            minutes: Number((v as unknown as { duration_minutes?: number }).duration_minutes ?? 60),
+            title: v.services?.name ?? "Visit",
+            who: v.providers?.display_name ?? "your provider",
+            status: v.provider_response === "cancel" ? "cancelled" : v.status,
+            amount: Number(v.price),
+          }))}
+        />
+        <details className="mt-5">
+          <summary className="cursor-pointer text-sm font-bold">Show as a list</summary>
         <div className="mt-4 space-y-6">
           {fortnight.map((d, i) => {
               const list = byDay.get(dayKey(d));
@@ -234,6 +253,7 @@ export default async function DiaryPage({ searchParams }: { searchParams: Promis
               );
             })}
         </div>
+        </details>
       </section>
 
       <section aria-labelledby="plans">

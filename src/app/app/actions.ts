@@ -63,6 +63,11 @@ export async function providerAction(visitId: string, action: "proceed" | "propo
   return res;
 }
 
+export async function movePreviewAction(visitId: string) {
+  const { supabase, profile } = await session();
+  return core.movePreview(supabase, profile, visitId);
+}
+
 export async function signAgreementAction(contractId: string) {
   const { supabase, profile } = await session();
   const res = await core.signAgreement(supabase, profile, contractId, "user");

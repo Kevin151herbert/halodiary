@@ -306,3 +306,16 @@ textarea.clay-inset:focus {
     transform: translate(-50%, 4px);
   }
 }
+
+/* Bryntum Calendar in the HaloDiary look */
+.hd-planner .b-calendar {
+  font-family: inherit;
+  --b-primary: #1d2238;
+}
+.hd-planner .b-cal-event-wrap .b-cal-event {
+  border-radius: 12px;
+}
+.hd-planner .hd-who {
+  opacity: 0.8;
+  font-weight: 400;
+}

@@ -8,6 +8,7 @@ import {
   defaultTermsFor,
   governingContract,
   planIdForVisit,
+  providerChangeCredit,
   reminderFor,
   sanitizeTerms,
   type Contract,
@@ -214,6 +215,21 @@ export async function changeCost(supabase: SupabaseClient, profile: Profile, v: 
     lateMovesThisMonth = count ?? 0;
   }
   return clientChangeCost(contract.terms, { price: Number(v.price), hoursUntil, kind, lateMovesThisMonth });
+}
+
+/** What dragging a visit to a new time would cost, shown before anything changes. */
+export async function movePreview(supabase: SupabaseClient, profile: Profile, visitId: string) {
+  const v = await getVisit(supabase, visitId);
+  if (!v) return { error: "Visit not found" };
+  if (!["scheduled", "awaiting", "confirmed"].includes(v.status)) return { error: "This visit can no longer be moved." };
+  if (profile.role === "provider") {
+    const contract = await governingContract(supabase, await planIdForVisit(supabase, v));
+    const hoursUntil = (new Date(v.scheduled_at).getTime() - nowFor(profile).getTime()) / 3_600_000;
+    const c = contract?.status === "active" ? providerChangeCredit(contract.terms, { price: Number(v.price), hoursUntil, kind: "move" }) : { late: false, credit: 0, reason: "" };
+    return { ok: true, side: "provider" as const, late: c.late, amount: c.credit, reason: c.reason, service: v.services?.name ?? "Visit" };
+  }
+  const c = await changeCost(supabase, profile, v, "reschedule");
+  return { ok: true, side: "client" as const, late: c.late, amount: c.fee, reason: c.reason, service: v.services?.name ?? "Visit" };
 }
 
 /** The client's answer to a day-before check (or any upcoming visit). */

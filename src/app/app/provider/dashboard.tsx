@@ -11,6 +11,7 @@ import { getSession } from "@/lib/supabase/server";
 import { dayKey, fmt, fmtDay, monthKey, monthRange } from "@/lib/time";
 import { NewClientActions, SampleClientsButton } from "./dashboard-controls";
 import { ScheduleCalendar } from "./schedule-calendar";
+import { WeekPlanner } from "@/components/week-planner";
 
 /** A real provider's home: schedule, new client requests, ratings and attendance. */
 export async function ProviderDashboard({ providerId }: { providerId: string }) {
@@ -194,6 +195,28 @@ export async function ProviderDashboard({ providerId }: { providerId: string }) 
           </section>
         </aside>
       </div>
+
+      <section aria-labelledby="planner" className="clay p-5 sm:p-6">
+        <h2 id="planner" className="text-xl font-bold">
+          Week planner
+        </h2>
+        <p className="mb-4 text-sm text-slate">Drag a visit to ask your client for a new time.</p>
+        <WeekPlanner
+          side="provider"
+          tz={tz}
+          currency={me.currency}
+          nowIso={now.toISOString()}
+          visits={all.map((v) => ({
+            id: v.id,
+            scheduled_at: v.scheduled_at,
+            minutes: Number((v as unknown as { duration_minutes?: number }).duration_minutes ?? 60),
+            title: v.services?.name ?? "Visit",
+            who: nameOf.get(v.client_id) ?? "a client",
+            status: v.status,
+            amount: Math.round(Number(v.price) * (1 - COMMISSION) * 100) / 100,
+          }))}
+        />
+      </section>
 
       <section aria-labelledby="earnings">
         <h2 id="earnings" className="text-xl font-bold">
