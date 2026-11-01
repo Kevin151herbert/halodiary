@@ -348,6 +348,12 @@ export async function completeVisit(supabase: SupabaseClient, profile: Profile, 
     mode,
     credit: creditUsed,
   });
+  // Ask for a rating in the chat with this provider. Only for visits that just finished,
+  // so a long demo-clock jump doesn't flood the thread with old requests.
+  if (nowFor(profile).getTime() - new Date(v.scheduled_at).getTime() < 3 * 86_400_000) {
+    const { requestRating } = await import("./chat");
+    await requestRating(supabase, v, profile.timezone);
+  }
 }
 
 /** Charge a late-change fee under the agreement and pay it on to the provider. */

@@ -17,7 +17,8 @@ Built for the PayPal AI Hackathon (Devpost, November 2026).
 5. On the **Diary**, use the **demo clock** (+1 day) to watch day-before checks arrive. Proceed, move, or skip a visit.
 6. Open **Provider view** to answer as the provider, propose a new time, or mark a visit done. The ledger shows the hold, the charge and the provider payout with PayPal references.
 7. **Agreements** lists every signed agreement with its clauses, both signatures, a fingerprint of the signed terms and the version history. Propose a change and it becomes a new version once both sides sign. The scheduler enforces the terms: a late skip charges the agreed fee through PayPal and pays it on to the provider; a late provider move or cancellation credits the client, and the credit comes off the next payment; ending a service keeps the visits inside the notice period.
-8. **Activity** shows every action and who took it: you, the assistant, or the scheduler.
+8. **Messages** is the in-app chat between client and provider, so arrangements don't end up in WhatsApp. Tap **Extra service** to ask for more work (an oven clean, an extra hour); the provider quotes in the thread and the client pays with the **Pay with PayPal** button right in the chat (90% goes to the provider, recorded in the ledger). **Pay** sends a tip or an agreed extra. After every visit a **Rate this visit** card appears; the stars go on the provider's public profile. Demo providers have no login, so HaloDiary's AI replies in their voice and quotes fair prices.
+9. **Activity** shows every action and who took it: you, the assistant, or the scheduler.
 
 ## How PayPal is used
 

@@ -41,6 +41,7 @@ const APPROVE_LABEL: Record<string, string> = {
   answer_as_provider: "Confirm",
   propose_agreement_change: "Sign and propose",
   sign_agreement: "Sign",
+  message_provider: "Send",
 };
 
 function approvalText(name: string, input: Record<string, unknown> = {}) {
@@ -294,6 +295,8 @@ export function AssistantShell({
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
   const toggle = (on: boolean) => start(() => toggleAssistantAction(on));
+  // In a chat thread the launcher would sit on top of the message box, so it moves up out of the way.
+  const inThread = usePathname().startsWith("/app/messages/");
 
   return (
     <div className={open ? "sm:pr-[420px]" : ""}>
@@ -303,7 +306,7 @@ export function AssistantShell({
         <button
           onClick={() => setOpen(true)}
           aria-label={enabled ? "Ask HaloDiary" : "Assistant off"}
-          className={`fixed bottom-24 right-4 z-30 inline-flex items-center gap-2 rounded-full p-3.5 text-sm font-bold md:bottom-6 md:right-6 md:px-5 md:py-3 ${
+          className={`fixed ${inThread ? "top-3 bottom-auto md:top-6 md:bottom-auto" : "bottom-24 md:bottom-6"} right-4 z-30 inline-flex items-center gap-2 rounded-full p-3.5 text-sm font-bold md:right-6 md:px-5 md:py-3 ${
             enabled ? "clay-btn-ink" : "clay-btn-ghost text-slate"
           }`}
         >

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import * as core from "@/lib/actions-core";
+import * as chat from "@/lib/chat";
 import { log } from "@/lib/engine";
 import { getSession } from "@/lib/supabase/server";
 
@@ -149,4 +150,69 @@ export async function signOutAction() {
   const { supabase } = await session();
   await supabase.auth.signOut();
   redirect("/");
+}
+
+// ---------- Chat ----------
+
+function chatDone(id?: string) {
+  revalidatePath("/app/messages");
+  if (id) revalidatePath(`/app/messages/${id}`);
+}
+
+export async function openChatAction(providerId: string) {
+  const { supabase, profile } = await session();
+  const id = await chat.conversationWith(supabase, profile.id, providerId);
+  redirect(`/app/messages/${id}`);
+}
+
+export async function sendChatAction(conversationId: string, body: string, kind: "text" | "extra_request" = "text", visitId?: string | null) {
+  const { supabase, profile } = await session();
+  const res =
+    profile.role === "provider"
+      ? await chat.providerSend(supabase, profile, conversationId, { body })
+      : await chat.clientSend(supabase, profile, conversationId, { body, kind, visitId });
+  chatDone(conversationId);
+  return res;
+}
+
+export async function demoReplyAction(conversationId: string) {
+  const { supabase, profile } = await session();
+  const res = await chat.demoReply(supabase, profile, conversationId);
+  chatDone(conversationId);
+  return res;
+}
+
+export async function requestPaymentAction(conversationId: string, body: string, amount: number, replyTo?: string | null) {
+  const { supabase, profile } = await session();
+  if (profile.role !== "provider") return { error: "Only providers send payment requests." };
+  const res = await chat.providerSend(supabase, profile, conversationId, { body, amount, replyTo });
+  chatDone(conversationId);
+  return res;
+}
+
+export async function payRequestAction(messageId: string) {
+  const { supabase, profile } = await session();
+  const res = await chat.payRequest(supabase, profile, messageId);
+  done();
+  return res;
+}
+
+export async function sendPaymentAction(conversationId: string, amount: number, note: string) {
+  const { supabase, profile } = await session();
+  const res = await chat.sendPayment(supabase, profile, conversationId, amount, note);
+  done();
+  return res;
+}
+
+export async function rateVisitAction(messageId: string, rating: number, comment: string) {
+  const { supabase, profile } = await session();
+  const res = await chat.rateVisit(supabase, profile, messageId, rating, comment);
+  chatDone();
+  return res;
+}
+
+export async function markChatReadAction(conversationId: string) {
+  const { supabase, profile } = await session();
+  await chat.markRead(supabase, conversationId, profile.role === "provider" ? "provider" : "client");
+  done();
 }

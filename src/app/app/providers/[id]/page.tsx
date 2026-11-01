@@ -7,6 +7,8 @@ import { nowFor } from "@/lib/engine";
 import { cadenceLabel } from "@/lib/cadence";
 import { searchProviders } from "@/lib/actions-core";
 import { getSession } from "@/lib/supabase/server";
+import { MessageCircle } from "lucide-react";
+import { openChatAction } from "../../actions";
 import { AddToDiary } from "./add-to-diary";
 
 export default async function ProviderPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ service?: string }> }) {
@@ -51,6 +53,13 @@ export default async function ProviderPage({ params, searchParams }: { params: P
               </div>
             </div>
           </div>
+          {profile!.role === "client" && (
+            <form action={openChatAction.bind(null, provider.id)} className="mt-5">
+              <button className="clay-btn-ghost inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-bold">
+                <MessageCircle size={16} aria-hidden /> Message {provider.display_name.split(" ")[0]}
+              </button>
+            </form>
+          )}
           <p className="mt-6 max-w-prose leading-relaxed">{provider.bio}</p>
           <p className="mt-3 text-sm text-slate">
             Speaks {provider.languages.join(", ")}. Usually replies within {provider.responds_within_hours} hours.

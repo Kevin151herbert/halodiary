@@ -3,6 +3,7 @@
 import { createClient } from "@supabase/supabase-js";
 import * as core from "../src/lib/actions-core";
 import { attendanceFor } from "../src/lib/attendance";
+import * as chat from "../src/lib/chat";
 import { governingContract } from "../src/lib/contract";
 import { advance, forecastMonth, monthKey, nowFor, VISIT_SELECT, type VisitRow } from "../src/lib/engine";
 import type { Profile } from "../src/lib/supabase/server";
@@ -207,6 +208,38 @@ async function main() {
     `${ended.kept} kept`,
   );
 
+  // ---- Chat: extra requests, payments in chat, ratings ----
+  const convId = await chat.conversationWith(supabase, uid, cleaner.provider_id);
+  const sent = await chat.clientSend(supabase, p, convId, { body: "Could you also clean the oven and the inside of the fridge on the next visit?", kind: "extra_request" });
+  check("client sends an extra service request in chat", "message" in sent && !!sent.message, "error" in sent ? sent.error : "");
+  const dr = await chat.demoReply(supabase, p, convId);
+  const quote = "request" in dr ? dr.request : null;
+  check(
+    "demo provider replies and quotes the extra",
+    !!quote && quote.kind === "payment_request" && Number(quote.amount) > 0,
+    quote ? `${quote.body}: ${quote.amount}; "${"reply" in dr ? dr.reply?.body : ""}"` : JSON.stringify(dr),
+  );
+  if (quote) {
+    const paid = (await chat.payRequest(supabase, p, quote.id)) as { ok?: boolean; error?: string };
+    const again = (await chat.payRequest(supabase, p, quote.id)) as { error?: string };
+    const { data: extra } = await supabase.from("ledger_entries").select("kind, amount").eq("client_id", uid).eq("kind", "extra");
+    check("paying the request in chat charges it once and records it", !!paid.ok && !!again.error && extra?.length === 1 && Number(extra[0].amount) === Number(quote.amount), JSON.stringify(extra));
+  }
+  const tip = (await chat.sendPayment(supabase, p, convId, 5, "Tip, thank you")) as { ok?: boolean };
+  const { data: receipts } = await supabase.from("messages").select("kind").eq("conversation_id", convId).eq("kind", "payment");
+  check("client can send a payment from the chat", !!tip.ok && receipts?.length === 2, `${receipts?.length} receipts`);
+
+  const { data: rr } = await supabase.from("messages").select("id, visit_id, conversations!inner(client_id)").eq("kind", "rating_request").eq("conversations.client_id", uid).limit(1);
+  check("a rating request arrives in chat after a visit", (rr?.length ?? 0) > 0, `${rr?.length}`);
+  if (rr?.length) {
+    const before = (await supabase.from("providers").select("review_count").eq("id", (await supabase.from("visits").select("provider_id").eq("id", rr[0].visit_id!).single()).data!.provider_id).single()).data!;
+    const rated = (await chat.rateVisit(supabase, p, rr[0].id, 5, "Spotless, thank you")) as { ok?: boolean; error?: string };
+    const twice = (await chat.rateVisit(supabase, p, rr[0].id, 1, "")) as { error?: string };
+    const { data: review } = await supabase.from("reviews").select("rating, provider_id").eq("visit_id", rr[0].visit_id!).single();
+    const after = (await supabase.from("providers").select("review_count").eq("id", review!.provider_id).single()).data!;
+    check("rating is saved once and counts on the provider's profile", !!rated.ok && !!twice.error && review?.rating === 5 && after.review_count === before.review_count + 1, rated.error ?? "");
+  }
+
   // Activity log has user and system entries
   const { data: act } = await supabase.from("activity_log").select("actor").eq("user_id", uid);
   const actors = new Set((act ?? []).map((a) => a.actor));
@@ -215,7 +248,7 @@ async function main() {
   // Privacy: a second user sees none of this
   const other = await anon.auth.signUp({ email: `judge-${id}b@halodiary.app`, password: crypto.randomUUID() });
   const s2 = createClient(url, key, { auth: { persistSession: false }, global: { headers: { Authorization: `Bearer ${other.data.session!.access_token}` } } });
-  const leaks = await Promise.all(["plans", "visits", "ledger_entries", "budgets", "notifications", "activity_log", "contracts"].map(async (t) => (await s2.from(t).select("*", { count: "exact", head: true })).count ?? 0));
+  const leaks = await Promise.all(["plans", "visits", "ledger_entries", "budgets", "notifications", "activity_log", "contracts", "conversations", "messages"].map(async (t) => (await s2.from(t).select("*", { count: "exact", head: true })).count ?? 0));
   check("another user sees none of this user's data", leaks.every((n) => n === 0), leaks.join(","));
   const fresh = createClient(url, key, { auth: { persistSession: false } });
   const anonView = await fresh.from("providers").select("id", { count: "exact", head: true });

@@ -5,6 +5,7 @@ import { changeCost, upcomingVisits } from "@/lib/actions-core";
 import { forecastMonth, MINUTES_SAVED_PER_VISIT, monthKey, nowFor } from "@/lib/engine";
 import { getSession } from "@/lib/supabase/server";
 import { addDays, dayKey as dayKeyZ, fmt, fmtDay as fmtDayZ, fmtTime as fmtTimeZ, localInputValue, zonedTime, zParts } from "@/lib/time";
+import { openChatAction } from "./actions";
 import { DemoClock, PlanControls, ProposalAnswer, VisitAnswer } from "./diary-controls";
 
 export default async function DiaryPage({ searchParams }: { searchParams: Promise<{ added?: string }> }) {
@@ -266,6 +267,9 @@ export default async function DiaryPage({ searchParams }: { searchParams: Promis
                     <Link href="/app/agreements" className="hover:text-ink">
                       Agreement
                     </Link>
+                    <form action={openChatAction.bind(null, pl.provider_id)}>
+                      <button className="font-bold hover:text-ink">Chat</button>
+                    </form>
                   </div>
                 </Card>
               </li>

@@ -8,6 +8,7 @@ import { z } from "zod";
 import * as core from "../actions-core";
 import { CADENCE_KEYS, cadenceLabel } from "../cadence";
 import { attendanceFor } from "../attendance";
+import * as chat from "../chat";
 import { TERM_OPTIONS } from "../contract";
 import { forecastMonth, monthKey, nowFor, spentInMonth } from "../engine";
 import type { Profile } from "../supabase/server";
@@ -210,6 +211,30 @@ export function buildTools(supabase: SupabaseClient, profile: Profile) {
         const { summary, ...terms } = rest;
         void summary;
         return core.proposeAmendment(supabase, profile, { planId: plan_id, terms, note }, "assistant");
+      },
+    }),
+
+    message_provider: tool({
+      description:
+        "Send a message to a provider in the in-app chat (questions, extra service requests, notes for the next visit). Use kind 'extra_request' when asking for extra work so the provider can quote; the client then pays with the button in the chat. Needs the user's approval.",
+      inputSchema: z.object({
+        provider_id: z.string(),
+        provider_name: z.string().describe("Copy exactly as given"),
+        message: z.string().describe("The message, written as the client, in first person"),
+        kind: z.enum(["text", "extra_request"]),
+        summary: z.string().describe("For the approval card, e.g. 'Ask Lucía K. to also clean the oven on Friday'"),
+      }),
+      execute: async ({ provider_id, message, kind }) => {
+        const convId = await chat.conversationWith(supabase, profile.id, provider_id);
+        const sent = await chat.clientSend(supabase, profile, convId, { body: message, kind });
+        if ("error" in sent) return { error: sent.error };
+        const reply = "demo" in sent && sent.demo ? await chat.demoReply(supabase, profile, convId) : null;
+        return {
+          ok: true,
+          chat_url: `/app/messages/${convId}`,
+          provider_reply: reply && "reply" in reply ? reply.reply?.body : "The provider will reply in the chat.",
+          quote: reply && "request" in reply && reply.request ? { for: reply.request.body, amount: Number(reply.request.amount) } : null,
+        };
       },
     }),
 

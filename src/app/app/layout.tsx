@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { AssistantShell } from "@/components/assistant/shell";
 import { Logo } from "@/components/ui";
+import { unreadCount } from "@/lib/chat";
 import { advance, nowFor } from "@/lib/engine";
 import { getSession } from "@/lib/supabase/server";
 import { fmtShort } from "@/lib/time";
@@ -20,6 +21,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     .eq("user_id", profile.id)
     .is("read_at", null);
 
+  const chats = await unreadCount(supabase, profile);
   const now = nowFor(profile);
   const aiConfigured = Boolean(process.env.ANTHROPIC_API_KEY);
 
@@ -34,7 +36,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <aside className="sticky top-0 hidden h-dvh w-64 shrink-0 p-4 md:flex">
           <div className="clay flex w-full flex-col px-4 py-6">
           <Logo className="px-2" />
-          <Nav role={profile.role} unread={unread ?? 0} />
+          <Nav role={profile.role} unread={unread ?? 0} chats={chats} />
           <div className="mt-auto space-y-1 px-2 text-xs text-slate">
             <p className="font-bold text-ink">{profile.full_name}</p>
             <p>{profile.city ?? "Location set"}</p>
@@ -52,7 +54,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </header>
           <main className="mx-auto w-full max-w-5xl flex-1 px-5 pb-28 pt-6 sm:px-8 md:pb-12 md:pt-10">{children}</main>
           <div className="clay fixed inset-x-3 bottom-3 z-20 md:hidden">
-            <Nav role={profile.role} unread={unread ?? 0} compact />
+            <Nav role={profile.role} unread={unread ?? 0} chats={chats} compact />
           </div>
         </div>
       </div>

@@ -15,6 +15,7 @@ const PAGE_NAMES: Record<string, string> = {
   "/app/provider": "Provider view (answering visits as a provider)",
   "/app/activity": "Activity log",
   "/app/agreements": "Agreements (the signed terms for each service)",
+  "/app/messages": "Messages (chats with providers)",
   "/app/settings": "Settings (assistant switches)",
 };
 
@@ -62,6 +63,28 @@ export async function buildContext(supabase: SupabaseClient, profile: Profile, p
         `- agreement ${c.id} for plan ${c.plan_id}, v${c.version} ${c.status}${c.status === "pending" ? ` (waiting for ${c.provider_signed_at ? "client" : "provider"} signature)` : ""}: free changes up to ${t.cancellation_notice_hours}h before, late fee ${t.late_cancellation_fee_pct}% (first ${t.free_reschedules_per_month} late moves a month free), provider gives ${t.provider_change_notice_hours}h notice or credits ${t.provider_late_change_credit_pct}% (late cancel ${t.provider_cancellation_credit_pct}%), reminder ${t.reminder_hours}h before, ${t.termination_notice_days} days' notice to end, price fixed ${t.price_lock_months} months`,
       );
     }
+
+    const { data: convs } = await supabase
+      .from("conversations")
+      .select("id, provider_id, last_message, last_message_at, client_read_at, providers(display_name)")
+      .eq("client_id", profile.id)
+      .order("last_message_at", { ascending: false })
+      .limit(6);
+    const { data: openRequests } = await supabase
+      .from("messages")
+      .select("body, amount, conversation_id, conversations!inner(client_id, providers(display_name))")
+      .eq("kind", "payment_request")
+      .eq("status", "open")
+      .eq("conversations.client_id", profile.id)
+      .limit(5);
+    lines.push("", "CHATS WITH PROVIDERS (in-app, replaces WhatsApp; payments requested there are paid with the chat's Pay button):");
+    if (!convs?.length) lines.push("- none yet");
+    for (const c of convs ?? [])
+      lines.push(
+        `- ${(c.providers as unknown as { display_name: string })?.display_name} (provider ${c.provider_id}): last "${c.last_message}"${c.last_message_at > c.client_read_at ? " (UNREAD)" : ""}, open at /app/messages/${c.id}`,
+      );
+    for (const r of openRequests ?? [])
+      lines.push(`- OPEN PAYMENT REQUEST from ${((r.conversations as unknown as { providers: { display_name: string } })?.providers)?.display_name}: ${r.body}, ${profile.currency} ${Number(r.amount).toFixed(2)}`);
 
     lines.push("", "NEXT 10 DAYS OF VISITS:");
     if (!visits.length) lines.push("- none");

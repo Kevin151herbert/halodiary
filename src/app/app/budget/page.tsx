@@ -182,7 +182,7 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
                 <tr key={e.id}>
                   <td className="px-4 py-2.5 text-slate">{fmt(e.created_at, p.timezone, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</td>
                   <td className="px-4 py-2.5 font-bold">
-                    {{ hold: "Held", capture: "Charged", void: "Released", payout: "Paid provider", refund: "Refunded", fee: "Late change fee", credit: "Agreement credit" }[e.kind as string]}
+                    {{ hold: "Held", capture: "Charged", void: "Released", payout: "Paid provider", refund: "Refunded", fee: "Late change fee", credit: "Agreement credit", extra: "Extra paid in chat" }[e.kind as string]}
                     {e.note && <span className="block text-xs font-normal text-slate">{e.note}</span>}
                   </td>
                   <td className="px-4 py-2.5">

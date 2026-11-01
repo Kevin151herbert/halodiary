@@ -1,16 +1,17 @@
 "use client";
 
-import { CalendarHeart, Compass, FileSignature, History, Settings, Store, Wallet } from "lucide-react";
+import { CalendarHeart, Compass, FileSignature, History, MessagesSquare, Settings, Store, Wallet } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-export function Nav({ role, unread, compact = false }: { role: "client" | "provider"; unread: number; compact?: boolean }) {
+export function Nav({ role, unread, chats = 0, compact = false }: { role: "client" | "provider"; unread: number; chats?: number; compact?: boolean }) {
   const path = usePathname();
   const items =
     role === "client"
       ? [
           { href: "/app", label: "Diary", icon: CalendarHeart, badge: unread },
           { href: "/app/discover", label: "Discover", icon: Compass },
+          { href: "/app/messages", label: "Messages", icon: MessagesSquare, badge: chats },
           { href: "/app/budget", label: "Budget", icon: Wallet },
           { href: "/app/agreements", label: "Agreements", icon: FileSignature },
           { href: "/app/provider", label: "Provider view", icon: Store },
@@ -19,6 +20,7 @@ export function Nav({ role, unread, compact = false }: { role: "client" | "provi
         ]
       : [
           { href: "/app/provider", label: "My visits", icon: CalendarHeart, badge: unread },
+          { href: "/app/messages", label: "Messages", icon: MessagesSquare, badge: chats },
           { href: "/app/agreements", label: "Agreements", icon: FileSignature },
           { href: "/app/activity", label: "Activity", icon: History },
           { href: "/app/settings", label: "Settings", icon: Settings },
