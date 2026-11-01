@@ -4,7 +4,7 @@ import Script from "next/script";
 import { useRouter } from "next/navigation";
 import { createElement, useCallback, useEffect, useRef, useState } from "react";
 
-type SaveSession = { start: (opts: { presentationMode: string }, setup: Promise<{ setupToken: string }>) => Promise<void> };
+type SaveSession = { start: (opts: { presentationMode: string }, setup: Promise<{ vaultSetupToken: string }>) => Promise<void> };
 type SdkInstance = {
   findEligibleMethods: (o: { currencyCode: string; paymentFlow: string }) => Promise<{ isEligible: (m: string) => boolean }>;
   createPayPalSavePaymentSession: (o: { onApprove: (d: { vaultSetupToken: string }) => Promise<void>; onCancel: () => void; onError: (e: unknown) => void }) => SaveSession;
@@ -73,7 +73,7 @@ export function PayPalV6Button({ month, cap, currency, fallback }: { month: stri
       .then((r) => r.json())
       .then((j) => {
         if (!j.id) throw new Error(j.error ?? "No setup token");
-        return { setupToken: j.id as string };
+        return { vaultSetupToken: j.id as string };
       });
     try {
       await session.current.start({ presentationMode: "auto" }, setup);
