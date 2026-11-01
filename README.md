@@ -29,7 +29,7 @@ No sign-up or email is needed, and the demo stays free to test until judging end
 
 **PayPal sandbox buyer for the approval step:** `SANDBOX_BUYER_EMAIL` / `SANDBOX_BUYER_PASSWORD` (sandbox only, no real money). You can also use any PayPal sandbox personal account of your own.
 
-Health check of the PayPal and scheduler wiring: https://halodiary.vercel.app/api/paypal/health
+Health check of the PayPal and scheduler wiring (open it while signed in to the demo): https://halodiary.vercel.app/api/paypal/health
 
 ## How PayPal is used
 

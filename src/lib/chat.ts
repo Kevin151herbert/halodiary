@@ -140,6 +140,7 @@ async function chargeExtra(supabase: SupabaseClient, profile: Profile, conv: Con
   let mode: "paypal_sandbox" | "simulated" = "simulated";
   let ref = `SIM-EXTRA-${Date.now().toString(36).toUpperCase()}`;
   let payoutRef = `SIM-PAYOUT-${ref.slice(10)}`;
+  let payoutMode: "paypal_sandbox" | "simulated" = "simulated";
   if (paypal.paypalConfigured() && profile.paypal_payment_token) {
     try {
       const auth = await paypal.authorizeWithVault({
@@ -152,15 +153,17 @@ async function chargeExtra(supabase: SupabaseClient, profile: Profile, conv: Con
       ref = await paypal.captureAuthorization(auth.authorizationId);
       mode = "paypal_sandbox";
       const { data: prov } = await supabase.from("providers").select("paypal_email").eq("id", conv.provider_id).maybeSingle();
-      const receiver = prov?.paypal_email || process.env.PAYPAL_PAYOUT_RECEIVER;
-      if (receiver) payoutRef = await paypal.payout({ receiver, amount: share, currency: cur, note: `HaloDiary extra: ${description}`.slice(0, 120) });
+      const po = await paypal.payProvider({ providerEmail: prov?.paypal_email, amount: share, currency: cur, note: `HaloDiary extra: ${description}`.slice(0, 120), fallbackRef: payoutRef });
+      payoutRef = po.ref;
+      payoutMode = po.mode;
+      if (po.error) await log(supabase, profile.id, "system", "PayPal payout failed, recorded as simulated", { error: po.error });
     } catch (e) {
       await log(supabase, profile.id, "system", "PayPal extra payment failed, recorded as simulated", { error: String(e) });
     }
   }
   await supabase.from("ledger_entries").insert([
     { client_id: profile.id, visit_id: visitId, provider_id: conv.provider_id, kind: "extra", amount, paypal_ref: ref, mode, note: description.slice(0, 140) },
-    { client_id: profile.id, visit_id: visitId, provider_id: conv.provider_id, kind: "payout", amount: share, paypal_ref: payoutRef, mode, note: "Extra paid in chat" },
+    { client_id: profile.id, visit_id: visitId, provider_id: conv.provider_id, kind: "payout", amount: share, paypal_ref: payoutRef, mode: payoutMode, note: "Extra paid in chat" },
   ]);
   return { ref, mode, share };
 }

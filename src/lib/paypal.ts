@@ -309,6 +309,22 @@ export async function payout(opts: { receiver: string; amount: number; currency:
   return json.batch_header.payout_batch_id;
 }
 
+/**
+ * Pay a provider their share. Uses the provider's PayPal email, else PAYPAL_PAYOUT_RECEIVER, else a sandbox
+ * address that leaves the payout unclaimed (still a real Payouts batch). Never throws: a failure is reported
+ * so the ledger records the payout as simulated instead of pretending it went through PayPal.
+ */
+export async function payProvider(opts: { providerEmail?: string | null; amount: number; currency: string; note: string; fallbackRef: string }) {
+  if (!paypalConfigured() || opts.amount <= 0) return { ref: opts.fallbackRef, mode: "simulated" as const, error: null };
+  const receiver = opts.providerEmail || process.env.PAYPAL_PAYOUT_RECEIVER || "provider-payouts@halodiary.example";
+  try {
+    const ref = await payout({ receiver, amount: opts.amount, currency: opts.currency, note: opts.note });
+    return { ref, mode: "paypal_sandbox" as const, error: null };
+  } catch (e) {
+    return { ref: opts.fallbackRef, mode: "simulated" as const, error: String(e instanceof Error ? e.message : e).slice(0, 300) };
+  }
+}
+
 /** Recent transactions for the assistant's spend questions (requires transaction search on the app). */
 export async function listTransactions(startIso: string, endIso: string) {
   const qs = new URLSearchParams({ start_date: startIso, end_date: endIso, fields: "transaction_info" });

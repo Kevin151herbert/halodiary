@@ -1,4 +1,4 @@
-import { verifyWebhook } from "@/lib/paypal";
+import { payProvider, verifyWebhook } from "@/lib/paypal";
 import { adminClient } from "@/lib/supabase/admin";
 
 type Event = { id: string; event_type: string; resource: Record<string, unknown> & { id?: string } };
@@ -127,7 +127,7 @@ async function openDispute(db: NonNullable<ReturnType<typeof adminClient>>, r: R
 
 /** A chat request the client chose to pay by PayPal invoice: settle it like a paid request. */
 async function invoicePaid(db: NonNullable<ReturnType<typeof adminClient>>, r: Record<string, unknown>) {
-  const inv = (r.invoice as { id?: string; amount?: { value?: string } } | undefined) ?? (r as { id?: string; amount?: { value?: string } });
+  const inv = (r.invoice as { id?: string; amount?: { value?: string; currency_code?: string } } | undefined) ?? (r as { id?: string; amount?: { value?: string; currency_code?: string } });
   const id = inv.id;
   if (!id) return "invoice without id";
   const { data: m } = await db.from("messages").select("*, conversations!inner(client_id, provider_id, providers(display_name))").eq("meta->>invoice_id", id).maybeSingle();
@@ -137,9 +137,11 @@ async function invoicePaid(db: NonNullable<ReturnType<typeof adminClient>>, r: R
   const amount = Number(m.amount);
   const share = Math.round(amount * 0.9 * 100) / 100;
   await db.from("messages").update({ status: "paid", meta: { ...(m.meta ?? {}), paypal_ref: id, mode: "paypal_sandbox" } }).eq("id", m.id);
+  const { data: prov } = await db.from("providers").select("paypal_email").eq("id", conv.provider_id).maybeSingle();
+  const po = await payProvider({ providerEmail: prov?.paypal_email, amount: share, currency: String(inv.amount && "currency_code" in inv.amount ? inv.amount.currency_code : "EUR"), note: `HaloDiary invoice ${id}`, fallbackRef: `SIM-PAYOUT-INV-${id}` });
   await db.from("ledger_entries").insert([
     { client_id: conv.client_id, provider_id: conv.provider_id, kind: "extra", amount, paypal_ref: id, mode: "paypal_sandbox", note: `Paid by PayPal invoice: ${m.body}`.slice(0, 140), paypal_confirmed_at: new Date().toISOString(), paypal_status: "PAID" },
-    { client_id: conv.client_id, provider_id: conv.provider_id, kind: "payout", amount: share, paypal_ref: `INV-SHARE-${id}`, mode: "paypal_sandbox", note: "Provider share of an invoice paid in PayPal" },
+    { client_id: conv.client_id, provider_id: conv.provider_id, kind: "payout", amount: share, paypal_ref: po.ref, mode: po.mode, note: "Provider share of an invoice paid in PayPal" },
   ]);
   await db.from("messages").insert({
     conversation_id: m.conversation_id,

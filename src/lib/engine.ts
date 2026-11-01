@@ -303,15 +303,15 @@ export async function completeVisit(supabase: SupabaseClient, profile: Profile, 
     const share = Math.round(price * (1 - COMMISSION) * 100) / 100;
     const mode = (v.payment_mode as "paypal_sandbox" | "simulated") ?? "simulated";
     let payoutId = `SIM-PAYOUT-${v.id.slice(0, 8).toUpperCase()}`;
-    if (mode === "paypal_sandbox" && paypal.paypalConfigured()) {
-      const receiver = v.providers?.paypal_email || process.env.PAYPAL_PAYOUT_RECEIVER;
-      if (receiver)
-        payoutId = await paypal
-          .payout({ receiver, amount: share, currency: cur, note: `${v.services?.name}, ${fmtDay(new Date(v.scheduled_at))}` })
-          .catch(() => payoutId);
+    let payoutMode: "paypal_sandbox" | "simulated" = "simulated";
+    if (mode === "paypal_sandbox") {
+      const po = await paypal.payProvider({ providerEmail: v.providers?.paypal_email, amount: share, currency: cur, note: `${v.services?.name}, ${fmtDay(new Date(v.scheduled_at))}`, fallbackRef: payoutId });
+      payoutId = po.ref;
+      payoutMode = po.mode;
+      if (po.error) await log(supabase, profile.id, "system", "PayPal payout failed, recorded as simulated", { visit: v.id, error: po.error });
     }
     await supabase.from("visits").update({ status: "completed" }).eq("id", v.id);
-    await supabase.from("ledger_entries").insert({ client_id: profile.id, visit_id: v.id, provider_id: v.provider_id, kind: "payout", amount: share, paypal_ref: payoutId, mode, note: "Covered by monthly PayPal subscription" });
+    await supabase.from("ledger_entries").insert({ client_id: profile.id, visit_id: v.id, provider_id: v.provider_id, kind: "payout", amount: share, paypal_ref: payoutId, mode: payoutMode, note: "Covered by monthly PayPal subscription" });
     await log(supabase, profile.id, actor, `Completed ${v.services?.name}; paid ${v.providers?.display_name} from the subscription`, { visit: v.id });
     if (nowFor(profile).getTime() - new Date(v.scheduled_at).getTime() < 3 * 86_400_000) {
       const { requestRating } = await import("./chat");
@@ -343,6 +343,7 @@ export async function completeVisit(supabase: SupabaseClient, profile: Profile, 
   let captureId = `SIM-CAP-${v.id.slice(0, 8).toUpperCase()}`;
   let payoutId = `SIM-PAYOUT-${v.id.slice(0, 8).toUpperCase()}`;
   const mode = (v.payment_mode as "paypal_sandbox" | "simulated") ?? "simulated";
+  let payoutMode: "paypal_sandbox" | "simulated" = "simulated";
 
   if (mode === "paypal_sandbox" && v.paypal_authorization_id && paypal.paypalConfigured()) {
     try {
@@ -352,10 +353,10 @@ export async function completeVisit(supabase: SupabaseClient, profile: Profile, 
       } else {
         // A partial final capture releases the rest of the hold.
         captureId = await paypal.captureAuthorization(v.paypal_authorization_id, charge < price ? { amount: charge, currency: cur } : undefined);
-        const receiver = v.providers?.paypal_email || process.env.PAYPAL_PAYOUT_RECEIVER;
-        if (receiver) {
-          payoutId = await paypal.payout({ receiver, amount: providerShare, currency: cur, note: `${v.services?.name}, ${fmtDay(new Date(v.scheduled_at))}` });
-        }
+        const po = await paypal.payProvider({ providerEmail: v.providers?.paypal_email, amount: providerShare, currency: cur, note: `${v.services?.name}, ${fmtDay(new Date(v.scheduled_at))}`, fallbackRef: payoutId });
+        payoutId = po.ref;
+        payoutMode = po.mode;
+        if (po.error) await log(supabase, profile.id, "system", "PayPal payout failed, recorded as simulated", { visit: v.id, error: po.error });
       }
     } catch (e) {
       await log(supabase, profile.id, "system", "PayPal capture or payout failed", { visit: v.id, error: String(e) });
@@ -366,7 +367,7 @@ export async function completeVisit(supabase: SupabaseClient, profile: Profile, 
   const note = creditUsed ? `${cur} ${creditUsed.toFixed(2)} agreement credit applied` : "";
   await supabase.from("ledger_entries").insert([
     { client_id: profile.id, visit_id: v.id, provider_id: v.provider_id, kind: "capture", amount: charge, paypal_ref: captureId, mode, note },
-    { client_id: profile.id, visit_id: v.id, provider_id: v.provider_id, kind: "payout", amount: providerShare, paypal_ref: payoutId, mode, note },
+    { client_id: profile.id, visit_id: v.id, provider_id: v.provider_id, kind: "payout", amount: providerShare, paypal_ref: payoutId, mode: payoutMode, note },
   ]);
   if (settled.length) await supabase.from("ledger_entries").update({ settled_at: new Date().toISOString() }).in("id", settled);
   await notify(
@@ -397,6 +398,7 @@ export async function chargeFee(supabase: SupabaseClient, profile: Profile, v: V
   let mode: "paypal_sandbox" | "simulated" = "simulated";
   let feeRef = `SIM-FEE-${v.id.slice(0, 8).toUpperCase()}`;
   let payoutRef = `SIM-PAYOUT-FEE-${v.id.slice(0, 8).toUpperCase()}`;
+  let payoutMode: "paypal_sandbox" | "simulated" = "simulated";
   if (paypal.paypalConfigured() && profile.paypal_payment_token) {
     try {
       const auth = await paypal.authorizeWithVault({
@@ -408,15 +410,17 @@ export async function chargeFee(supabase: SupabaseClient, profile: Profile, v: V
       });
       feeRef = await paypal.captureAuthorization(auth.authorizationId);
       mode = "paypal_sandbox";
-      const receiver = v.providers?.paypal_email || process.env.PAYPAL_PAYOUT_RECEIVER;
-      if (receiver) payoutRef = await paypal.payout({ receiver, amount: providerShare, currency: cur, note: `Late change fee, ${v.services?.name}` });
+      const po = await paypal.payProvider({ providerEmail: v.providers?.paypal_email, amount: providerShare, currency: cur, note: `Late change fee, ${v.services?.name}`, fallbackRef: payoutRef });
+      payoutRef = po.ref;
+      payoutMode = po.mode;
+      if (po.error) await log(supabase, profile.id, "system", "PayPal payout failed, recorded as simulated", { visit: v.id, error: po.error });
     } catch (e) {
       await log(supabase, profile.id, "system", "PayPal fee charge failed, recorded as simulated", { visit: v.id, error: String(e) });
     }
   }
   await supabase.from("ledger_entries").insert([
     { client_id: profile.id, visit_id: v.id, provider_id: v.provider_id, kind: "fee", amount, paypal_ref: feeRef, mode, note: reason },
-    { client_id: profile.id, visit_id: v.id, provider_id: v.provider_id, kind: "payout", amount: providerShare, paypal_ref: payoutRef, mode, note: "Late change fee" },
+    { client_id: profile.id, visit_id: v.id, provider_id: v.provider_id, kind: "payout", amount: providerShare, paypal_ref: payoutRef, mode: payoutMode, note: "Late change fee" },
   ]);
   await log(supabase, profile.id, "system", `Charged a ${cur} ${amount.toFixed(2)} late change fee for ${v.services?.name}`, { visit: v.id, reason, mode });
 }
