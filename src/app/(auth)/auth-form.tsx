@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { btn, Logo } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
+import { DemoLoginButton } from "../demo-login";
+import { JudgeIntro } from "../judge-intro";
 
 export function AuthForm({ mode }: { mode: "login" | "signup" }) {
   const router = useRouter();
@@ -31,7 +33,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
       setBusy(false);
       if (error) return setError(error.message);
       if (!data.session) return setInfo("Check your email to confirm your account, then log in.");
-      router.push("/onboarding");
+      router.push(role === "provider" ? "/onboarding" : "/start");
     } else {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       setBusy(false);
@@ -41,14 +43,24 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
     router.refresh();
   }
 
-  const field = "mt-1 w-full clay-sm px-4 py-3 text-base outline-none focus:border-ink";
+  const field = "clay-inset mt-1.5 w-full px-4 py-3 text-base font-normal";
 
   return (
-    <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-5 py-10">
-      <Link href="/" className="mb-10 self-start">
+    <div className="mx-auto grid min-h-dvh max-w-6xl items-center gap-10 px-5 py-10 sm:px-8 lg:grid-cols-[1fr_1fr]">
+      <JudgeIntro />
+    <div className="mx-auto w-full max-w-md lg:order-first">
+      <Link href="/" className="mb-8 inline-block">
         <Logo />
       </Link>
-      <h1 className="text-3xl font-extrabold">{mode === "signup" ? "Create your account" : "Log in"}</h1>
+      <div className="clay mb-8 p-5">
+        <p className="text-sm font-bold">Judging? Skip the form.</p>
+        <p className="mt-1 text-xs text-slate">One click creates a guest account. Payments run in the PayPal sandbox.</p>
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <DemoLoginButton role="client" className="w-full px-3" />
+          <DemoLoginButton role="provider" variant="ghost" className="w-full px-3" />
+        </div>
+      </div>
+      <h1 className="text-2xl font-extrabold">{mode === "signup" ? "Create your account" : "Log in"}</h1>
       <p className="mt-2 text-slate">
         {mode === "signup" ? "Takes under a minute. Payments stay in the PayPal sandbox." : "Welcome back to your diary."}
       </p>
@@ -121,6 +133,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
           </>
         )}
       </p>
+    </div>
     </div>
   );
 }

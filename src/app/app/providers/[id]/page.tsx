@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AttendanceCard } from "@/components/attendance";
-import { Avatar, Card, money, Rating } from "@/components/ui";
+import { Avatar, Card, Meter, money, Rating } from "@/components/ui";
+import { profileCompleteness } from "@/lib/match-shared";
 import { attendanceFor } from "@/lib/attendance";
 import { nowFor } from "@/lib/engine";
 import { cadenceLabel } from "@/lib/cadence";
@@ -26,6 +27,7 @@ export default async function ProviderPage({ params, searchParams }: { params: P
     .order("created_at", { ascending: false })
     .limit(6);
   const near = await searchProviders(supabase, profile!, { radiusKm: 50 });
+  const completeness = profileCompleteness({ ...provider, socials: provider.socials ?? {}, team: provider.team ?? [] });
   const attendance = await attendanceFor(supabase, id, nowFor(profile!).toISOString());
   const distance = near.results.find((r) => r.provider_id === id)?.distance_km;
 
@@ -41,7 +43,7 @@ export default async function ProviderPage({ params, searchParams }: { params: P
       <div className="mt-6 grid gap-8 lg:grid-cols-[1.3fr_1fr]">
         <section>
           <div className="flex items-center gap-5">
-            <Avatar name={provider.display_name} hue={provider.avatar_hue} size={76} />
+            <Avatar name={provider.display_name} hue={provider.avatar_hue} size={76} photo={provider.photo_url} />
             <div>
               <h1 className="text-3xl font-extrabold">{provider.display_name}</h1>
               <p className="mt-1 text-slate">{provider.headline}</p>
@@ -64,6 +66,48 @@ export default async function ProviderPage({ params, searchParams }: { params: P
           <p className="mt-3 text-sm text-slate">
             Speaks {provider.languages.join(", ")}. Usually replies within {provider.responds_within_hours} hours.
           </p>
+
+          <section className="clay-inset mt-6 grid gap-4 p-5 text-sm sm:grid-cols-2" aria-label="Details">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-slate">Team</p>
+              <p className="mt-1 font-bold">{provider.team_size > 1 ? `Team of ${provider.team_size}` : "Works solo"}</p>
+              {(provider.team ?? []).length > 0 && (
+                <p className="text-slate">{(provider.team as { name: string; role: string }[]).map((t) => `${t.name}${t.role ? ` (${t.role})` : ""}`).join(", ")}</p>
+              )}
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-slate">Trust</p>
+              <p className="mt-1">
+                {[provider.insured ? "Insured" : "Not insured", provider.certifications || null, provider.verified ? "ID checked" : null].filter(Boolean).join(" · ")}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-slate">Area</p>
+              <p className="mt-1">Travels up to {provider.service_radius_km} km{provider.accepting_clients ? "" : " · not taking new clients"}</p>
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-slate">Online</p>
+              <p className="mt-1 break-words">
+                {provider.website && !provider.is_demo ? (
+                  <a href={provider.website} target="_blank" rel="noopener noreferrer nofollow" className="font-bold underline">
+                    {provider.website.replace(/^https?:\/\//, "")}
+                  </a>
+                ) : null}
+                {Object.entries((provider.socials ?? {}) as Record<string, string>).map(([k, v]) => (
+                  <span key={k} className="mr-3 inline-block">
+                    {k === "x" ? "X" : k[0].toUpperCase() + k.slice(1)} @{v}
+                  </span>
+                ))}
+                {!provider.website && !Object.keys(provider.socials ?? {}).length && <span className="text-slate">No links shared</span>}
+              </p>
+            </div>
+            <div className="sm:col-span-2">
+              <p className="text-xs font-bold uppercase tracking-wide text-slate">Profile detail {Math.round(completeness.score * 100)}%</p>
+              <div className="mt-2">
+                <Meter value={completeness.score} label="Profile detail" />
+              </div>
+            </div>
+          </section>
 
           <div className="mt-8">
             <AttendanceCard data={attendance} tz={profile!.timezone} name={provider.display_name} />

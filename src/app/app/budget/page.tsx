@@ -5,8 +5,8 @@ import { getSession } from "@/lib/supabase/server";
 import { fmt, monthLabel } from "@/lib/time";
 import { SimulatedApprove } from "./simulated-approve";
 
-export default async function BudgetPage({ searchParams }: { searchParams: Promise<{ m?: string; approved?: string; paypal_error?: string }> }) {
-  const { m, approved, paypal_error } = await searchParams;
+export default async function BudgetPage({ searchParams }: { searchParams: Promise<{ m?: string; approved?: string; paypal_error?: string; welcome?: string }> }) {
+  const { m, approved, paypal_error, welcome } = await searchParams;
   const { supabase, profile } = await getSession();
   const p = profile!;
   const now = nowFor(p);
@@ -15,7 +15,9 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
   const month = m === "next" ? nextMonth : thisMonth;
   const label = monthLabel(month);
 
-  const forecast = await forecastMonth(supabase, p, month);
+  const raw = await forecastMonth(supabase, p, month);
+  // The budget chosen during setup becomes the suggested cap when it covers the forecast.
+  const forecast = { ...raw, cap: p.monthly_budget && Number(p.monthly_budget) >= raw.total ? Number(p.monthly_budget) : raw.cap };
   const { data: budget } = await supabase.from("budgets").select("*").eq("client_id", p.id).eq("month", month).maybeSingle();
   const used = await spentInMonth(supabase, p, month);
   const { data: ledger } = await supabase
@@ -50,6 +52,15 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
         </nav>
       </div>
 
+      {welcome && !budget && (
+        <div className="clay flex flex-wrap items-center gap-4 p-5">
+          <span className="clay-btn-halo inline-flex h-11 w-11 items-center justify-center rounded-2xl font-display text-lg font-extrabold">✓</span>
+          <div className="min-w-0 flex-1">
+            <p className="font-bold">Your services are on the diary and the agreements are signed.</p>
+            <p className="text-sm text-slate">Last step: approve {label} with PayPal. Nothing is charged until a visit is done.</p>
+          </div>
+        </div>
+      )}
       {approved && <p className="clay-sm px-4 py-3 font-bold text-sage">Budget approved{approved === "paypal" ? " with PayPal" : ""}. Visits will now confirm on their own.</p>}
       {paypal_error && (
         <p className="clay-sm px-4 py-3 text-sm text-rose">
@@ -140,7 +151,9 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
             <>
               <p className="text-sm text-slate">Approve once for {label}</p>
               <p className="mt-2 font-display text-4xl font-extrabold">{money(forecast.cap, p.currency)}</p>
-              <p className="text-sm text-slate">cap, charged per visit</p>
+              <p className="text-sm text-slate">
+                cap, charged per visit{p.monthly_budget && Number(p.monthly_budget) >= raw.total ? " (the budget you set)" : ""}
+              </p>
               <div className="mt-6 space-y-3">
                 {realPayPal && (
                   <form action="/api/paypal/start" method="post">

@@ -46,4 +46,7 @@ export type Profile = {
   paypal_payment_token: string | null;
   paypal_payer_email: string | null;
   clock_offset_hours: number;
+  interests?: string[];
+  monthly_budget?: number | null;
+  onboarded_at?: string | null;
 };

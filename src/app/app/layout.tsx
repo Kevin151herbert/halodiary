@@ -10,7 +10,8 @@ import { Nav } from "./nav";
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const { supabase, profile } = await getSession();
   if (!profile) redirect("/login");
-  if (profile.lat == null) redirect("/onboarding");
+  if (profile.role === "client" && !profile.onboarded_at) redirect("/start");
+  if (profile.lat == null) redirect(profile.role === "client" ? "/start" : "/onboarding");
 
   // Move visits along the timeline (day-before checks, holds, captures) before rendering.
   await advance(supabase, profile);

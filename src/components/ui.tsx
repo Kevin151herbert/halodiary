@@ -16,7 +16,19 @@ export function ButtonLink({ variant = "primary", ...props }: ComponentProps<typ
 }
 
 /** Initials on a soft colour, so demo providers need no photos. */
-export function Avatar({ name, hue, size = 44 }: { name: string; hue: number; size?: number }) {
+export function Avatar({ name, hue, size = 44, photo }: { name: string; hue: number; size?: number; photo?: string | null }) {
+  if (photo)
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={photo}
+        alt=""
+        width={size}
+        height={size}
+        className="shrink-0 rounded-full object-cover"
+        style={{ width: size, height: size, boxShadow: "4px 5px 10px -3px rgba(29,34,56,0.3), inset 1px 1px 2px rgba(255,255,255,0.9)" }}
+      />
+    );
   const initials = name
     .replace(/\./g, "")
     .split(" ")

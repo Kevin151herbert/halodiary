@@ -3,6 +3,7 @@ import { Avatar, Card, money, StatusPill } from "@/components/ui";
 import { COMMISSION, nowFor, VISIT_SELECT, type VisitRow } from "@/lib/engine";
 import { getSession } from "@/lib/supabase/server";
 import { fmtShort, localInputValue } from "@/lib/time";
+import { ProviderDashboard } from "./dashboard";
 import { ProviderVisitActions } from "./provider-actions";
 
 export default async function ProviderView({ searchParams }: { searchParams: Promise<{ p?: string }> }) {
@@ -29,9 +30,7 @@ export default async function ProviderView({ searchParams }: { searchParams: Pro
           </Link>
         </div>
       );
-    providerId = data.id;
-    providerName = data.display_name;
-    hue = data.avatar_hue;
+    return <ProviderDashboard providerId={data.id} />;
   } else {
     // Clients can step into the shoes of the demo providers they book, to see both sides.
     const { data: plans } = await supabase.from("plans").select("provider_id, providers(display_name, avatar_hue, is_demo)").eq("client_id", me.id);
@@ -71,10 +70,7 @@ export default async function ProviderView({ searchParams }: { searchParams: Pro
   const { data: payouts } = await supabase.from("ledger_entries").select("amount").eq("provider_id", providerId).eq("kind", "payout");
   const earned = (payouts ?? []).reduce((s, e) => s + Number(e.amount), 0);
   const upcoming = visits.filter((v) => ["scheduled", "awaiting", "confirmed"].includes(v.status));
-  const { data: unsigned } =
-    me.role === "provider"
-      ? await supabase.from("contracts").select("id, version, plans(services(name))").eq("provider_id", providerId).eq("status", "pending").is("provider_signed_at", null)
-      : { data: [] };
+  const unsigned: { id: string; version: number; plans: unknown }[] = [];
 
   return (
     <div className="space-y-8">

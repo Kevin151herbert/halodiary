@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarHeart, Compass, FileSignature, History, MessagesSquare, Settings, Store, Wallet } from "lucide-react";
+import { CalendarHeart, CircleUser, Compass, FileSignature, History, MessagesSquare, Settings, Store, Wallet } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -19,14 +19,16 @@ export function Nav({ role, unread, chats = 0, compact = false }: { role: "clien
           { href: "/app/settings", label: "Settings", icon: Settings },
         ]
       : [
-          { href: "/app/provider", label: "My visits", icon: CalendarHeart, badge: unread },
+          { href: "/app/provider", label: "Dashboard", icon: CalendarHeart, badge: unread },
           { href: "/app/messages", label: "Messages", icon: MessagesSquare, badge: chats },
+          { href: "/app/provider/profile", label: "Profile", icon: CircleUser },
           { href: "/app/agreements", label: "Agreements", icon: FileSignature },
           { href: "/app/activity", label: "Activity", icon: History },
           { href: "/app/settings", label: "Settings", icon: Settings },
         ];
 
-  const active = (href: string) => (href === "/app" ? path === "/app" : path === href || path.startsWith(`${href}/`));
+  const active = (href: string) =>
+    href === "/app" || href === "/app/provider" ? path === href : path === href || path.startsWith(`${href}/`);
 
   if (compact) {
     return (

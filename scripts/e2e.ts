@@ -4,6 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 import * as core from "../src/lib/actions-core";
 import { attendanceFor } from "../src/lib/attendance";
 import * as chat from "../src/lib/chat";
+import { rankProviders, targets } from "../src/lib/match";
 import { governingContract } from "../src/lib/contract";
 import { advance, forecastMonth, monthKey, nowFor, VISIT_SELECT, type VisitRow } from "../src/lib/engine";
 import type { Profile } from "../src/lib/supabase/server";
@@ -229,7 +230,7 @@ async function main() {
   const { data: receipts } = await supabase.from("messages").select("kind").eq("conversation_id", convId).eq("kind", "payment");
   check("client can send a payment from the chat", !!tip.ok && receipts?.length === 2, `${receipts?.length} receipts`);
 
-  const { data: rr } = await supabase.from("messages").select("id, visit_id, conversations!inner(client_id)").eq("kind", "rating_request").eq("conversations.client_id", uid).limit(1);
+  const { data: rr } = await supabase.from("messages").select("id, visit_id, conversations!inner(client_id)").eq("kind", "rating_request").eq("status", "open").eq("conversations.client_id", uid).limit(1);
   check("a rating request arrives in chat after a visit", (rr?.length ?? 0) > 0, `${rr?.length}`);
   if (rr?.length) {
     const before = (await supabase.from("providers").select("review_count").eq("id", (await supabase.from("visits").select("provider_id").eq("id", rr[0].visit_id!).single()).data!.provider_id).single()).data!;
@@ -239,6 +240,38 @@ async function main() {
     const after = (await supabase.from("providers").select("review_count").eq("id", review!.provider_id).single()).data!;
     check("rating is saved once and counts on the provider's profile", !!rated.ok && !!twice.error && review?.rating === 5 && after.review_count === before.review_count + 1, rated.error ?? "");
   }
+
+  // ---- Matching ----
+  const t = targets(600, [{ id: "cleaning", typical_price: 35, cadence: "twice_weekly" }, { id: "dog-walking", typical_price: 15, cadence: "weekends" }]);
+  const ranked = await rankProviders(supabase, p, "cleaning", t.cleaning, p.currency);
+  check(
+    "matches are ranked by score with attendance, rating, distance, price and profile parts",
+    ranked.length >= 3 && ranked.every((m, i) => i === 0 || ranked[i - 1].score >= m.score) && ranked.every((m) => Object.keys(m.parts).length === 5),
+    `${ranked.length} matches, top ${ranked[0]?.score} (${ranked[0]?.reasons.join("; ")})`,
+  );
+
+  // ---- Provider side: profile, sample clients, accepting a new client ----
+  const pro = await anon.auth.signUp({ email: `judge-pro-${id}@halodiary.app`, password: crypto.randomUUID(), options: { data: { full_name: `Pro ${id}`, role: "provider" } } });
+  const ps = createClient(url, key, { auth: { persistSession: false }, global: { headers: { Authorization: `Bearer ${pro.data.session!.access_token}` } } });
+  const proUid = pro.data.user!.id;
+  await ps.from("profiles").update({ lat: 41.39, lng: 2.17, city: "Barcelona" }).eq("id", proUid);
+  const { data: listing } = await ps.from("providers").insert({ profile_id: proUid, display_name: `Pro ${id}`, headline: "Careful home cleaning", lat: 41.39, lng: 2.17 }).select("id").single();
+  await ps.from("provider_services").insert({ provider_id: listing!.id, service_id: "cleaning", price: 32 });
+  const { error: upd } = await ps.from("providers").update({ website: "https://example.com", socials: { instagram: "procleans" }, team_size: 2, team: [{ name: "Ana", role: "Assistant" }], insured: true }).eq("id", listing!.id);
+  check("provider can edit their profile, team and links", !upd, upd?.message);
+  const { error: hijack } = await ps.from("providers").update({ headline: "hijacked" }).eq("id", cleaner.provider_id).select();
+  const { data: still } = await supabase.from("providers").select("headline").eq("id", cleaner.provider_id).single();
+  check("provider can't edit someone else's listing", still?.headline !== "hijacked", hijack?.message ?? "");
+  const loaded = await ps.rpc("load_sample_clients");
+  const proProfile = (await ps.from("profiles").select("*").eq("id", proUid).single()).data as Profile;
+  const { data: pend } = await ps.from("contracts").select("id").eq("provider_id", listing!.id).eq("status", "pending");
+  const signed = pend?.[0] ? ((await core.signAgreement(ps, proProfile, pend[0].id, "user")) as { active?: boolean }) : {};
+  const proAtt = await attendanceFor(ps, listing!.id, new Date().toISOString());
+  check(
+    "provider loads sample clients, accepts the new one, and sees attendance",
+    loaded.data === 2 && !!signed.active && proAtt.total > 0 && proAtt.cancelled === 1,
+    `${proAtt.total} visits, ${Math.round(proAtt.rate * 100)}% attended`,
+  );
 
   // Activity log has user and system entries
   const { data: act } = await supabase.from("activity_log").select("actor").eq("user_id", uid);

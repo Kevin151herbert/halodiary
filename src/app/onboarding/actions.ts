@@ -16,7 +16,7 @@ export async function finishOnboarding(input: {
   const { supabase, profile } = await getSession();
   if (!profile) redirect("/login");
   const timezone = isValidTz(input.timezone) ? input.timezone! : profile.timezone;
-  await supabase.from("profiles").update({ lat: input.lat, lng: input.lng, city: input.city, timezone }).eq("id", profile.id);
+  await supabase.from("profiles").update({ lat: input.lat, lng: input.lng, city: input.city, timezone, onboarded_at: new Date().toISOString() }).eq("id", profile.id);
 
   if (profile.role === "provider" && input.offers?.length) {
     const { data: existing } = await supabase.from("providers").select("id").eq("profile_id", profile.id).maybeSingle();
@@ -48,5 +48,5 @@ export async function finishOnboarding(input: {
       .insert(input.offers.map((o) => ({ provider_id: providerId, service_id: o.serviceId, price: o.price })));
   }
   await log(supabase, profile.id, "user", `Set location to ${input.city}`);
-  redirect(profile.role === "provider" ? "/app/provider" : "/app/discover");
+  redirect(profile.role === "provider" ? "/app/provider/profile?new=1" : "/start");
 }
