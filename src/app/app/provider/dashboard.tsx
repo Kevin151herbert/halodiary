@@ -1,6 +1,7 @@
 import { CalendarHeart, Star, Wallet } from "lucide-react";
 import Link from "next/link";
 import { AttendanceCard } from "@/components/attendance";
+import { LedgerGrid } from "@/components/ledger-grid";
 import { Avatar, IconChip, Meter, money, Rating, RingGauge } from "@/components/ui";
 import { attendanceFor } from "@/lib/attendance";
 import { cadenceLabel } from "@/lib/cadence";
@@ -37,7 +38,13 @@ export async function ProviderDashboard({ providerId }: { providerId: string }) 
         .eq("status", "pending")
         .is("provider_signed_at", null)
         .order("created_at", { ascending: false }),
-      supabase.from("ledger_entries").select("amount, created_at").eq("provider_id", providerId).eq("kind", "payout"),
+      supabase
+        .from("ledger_entries")
+        .select("id, kind, amount, created_at, client_id, paypal_ref, mode, note, paypal_confirmed_at, visits(services(name))")
+        .eq("provider_id", providerId)
+        .in("kind", ["payout", "refund", "credit"])
+        .order("created_at", { ascending: false })
+        .limit(500),
       supabase.from("reviews").select("author_name, rating, body, created_at").eq("provider_id", providerId).order("created_at", { ascending: false }).limit(4),
       attendanceFor(supabase, providerId, now.toISOString()),
       supabase.from("plans").select("id", { count: "exact", head: true }).eq("provider_id", providerId),
@@ -45,7 +52,7 @@ export async function ProviderDashboard({ providerId }: { providerId: string }) 
   const nameOf = new Map(((names ?? []) as { client_id: string; name: string }[]).map((n) => [n.client_id, n.name]));
   const all = (visitsRaw ?? []) as VisitRow[];
   const visits = all.filter((v) => new Date(v.scheduled_at).getTime() >= now.getTime() - 6 * 3_600_000 && new Date(v.scheduled_at).getTime() <= now.getTime() + 14 * 86_400_000);
-  const earned = (payouts ?? []).reduce((s, e) => s + Number(e.amount), 0);
+  const earned = (payouts ?? []).filter((e) => e.kind === "payout").reduce((s, e) => s + Number(e.amount), 0);
   const weekEnd = now.getTime() + 7 * 86_400_000;
   const thisWeek = visits.filter((v) => new Date(v.scheduled_at).getTime() <= weekEnd);
   const comp = profileCompleteness({ ...p, website: p.website ?? null, socials: p.socials ?? {}, team: p.team ?? [] });
@@ -187,6 +194,33 @@ export async function ProviderDashboard({ providerId }: { providerId: string }) 
           </section>
         </aside>
       </div>
+
+      <section aria-labelledby="earnings">
+        <h2 id="earnings" className="text-xl font-bold">
+          Earnings
+        </h2>
+        <p className="mt-1 text-sm text-slate">Every PayPal payout, refund and agreement credit. Search, sort and export it for your accounts.</p>
+        <div className="mt-4">
+          <LedgerGrid
+            currency={me.currency}
+            partyLabel="Client"
+            fileName="halodiary-earnings.csv"
+            rows={(payouts ?? []).map((e) => ({
+              id: e.id,
+              when: e.created_at,
+              whenLabel: fmt(e.created_at, tz, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }),
+              what: e.kind === "payout" ? "Payout" : e.kind === "refund" ? "Refunded" : "Credit to client",
+              service: (e.visits as unknown as { services?: { name: string } } | null)?.services?.name ?? "",
+              party: nameOf.get(e.client_id) ?? "Client",
+              amount: e.kind === "payout" ? Number(e.amount) : -Number(e.amount),
+              ref: e.paypal_ref ?? "",
+              mode: e.mode === "paypal_sandbox" ? "Sandbox" : "Simulated",
+              confirmed: e.paypal_confirmed_at ? "PayPal ✓" : "",
+              note: e.note ?? "",
+            }))}
+          />
+        </div>
+      </section>
 
       {attendance.total > 0 && <AttendanceCard data={attendance} tz={tz} name={p.display_name} />}
     </div>

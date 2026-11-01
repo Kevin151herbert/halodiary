@@ -5,6 +5,18 @@ import { getSession } from "@/lib/supabase/server";
 import { fmt, monthLabel } from "@/lib/time";
 import { SimulatedApprove } from "./simulated-approve";
 import { StatementButton } from "./statement-button";
+import { LedgerGrid } from "@/components/ledger-grid";
+
+const LABEL: Record<string, string> = {
+  hold: "Held",
+  capture: "Charged",
+  void: "Released",
+  payout: "Paid provider",
+  refund: "Refunded",
+  fee: "Late change fee",
+  credit: "Agreement credit",
+  extra: "Extra paid in chat",
+};
 
 export default async function BudgetPage({ searchParams }: { searchParams: Promise<{ m?: string; approved?: string; paypal_error?: string; welcome?: string }> }) {
   const { m, approved, paypal_error, welcome } = await searchParams;
@@ -26,7 +38,7 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
     .select("*, providers(display_name), visits(scheduled_at, services(name))")
     .eq("client_id", p.id)
     .order("created_at", { ascending: false })
-    .limit(25);
+    .limit(500);
 
   const cap = budget ? Number(budget.cap) : forecast.cap;
   const pct = cap ? Math.min(100, (used / cap) * 100) : 0;
@@ -183,55 +195,24 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
           <p className="text-sm text-slate">Every hold, charge, release, refund and payout, with its PayPal reference. A tick means PayPal confirmed it by webhook.</p>
           {realPayPal && p.paypal_payer_email && <StatementButton month={month} label={label} />}
         </div>
-        <div className="mt-4 overflow-x-auto clay">
-          <table className="w-full min-w-[640px] text-sm">
-            <thead className="text-left text-slate">
-              <tr>
-                <th className="px-4 py-2.5 font-normal">When</th>
-                <th className="px-4 py-2.5 font-normal">What</th>
-                <th className="px-4 py-2.5 font-normal">Visit</th>
-                <th className="px-4 py-2.5 text-right font-normal">Amount</th>
-                <th className="px-4 py-2.5 font-normal">PayPal reference</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-mist">
-              {(ledger ?? []).map((e) => (
-                <tr key={e.id}>
-                  <td className="px-4 py-2.5 text-slate">{fmt(e.created_at, p.timezone, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</td>
-                  <td className="px-4 py-2.5 font-bold">
-                    {{ hold: "Held", capture: "Charged", void: "Released", payout: "Paid provider", refund: "Refunded", fee: "Late change fee", credit: "Agreement credit", extra: "Extra paid in chat" }[e.kind as string]}
-                    {e.note && <span className="block text-xs font-normal text-slate">{e.note}</span>}
-                  </td>
-                  <td className="px-4 py-2.5">
-                    {e.visits?.services?.name}
-                    {e.kind === "payout" && <span className="text-slate"> to {e.providers?.display_name}</span>}
-                  </td>
-                  <td className={`px-4 py-2.5 text-right ${e.kind === "credit" ? "text-sage" : ""}`}>
-                    {e.kind === "credit" ? "−" : ""}
-                    {money(Number(e.amount), p.currency)}
-                  </td>
-                  <td className="px-4 py-2.5">
-                    <code className="text-xs">{e.paypal_ref}</code>{" "}
-                    <span className={`ml-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${e.mode === "paypal_sandbox" ? "bg-[#ffc439]/40" : "bg-mist text-slate"}`}>
-                      {e.mode === "paypal_sandbox" ? "Sandbox" : "Simulated"}
-                    </span>
-                    {e.paypal_confirmed_at && (
-                      <span className="ml-1 rounded-full bg-sage-soft px-2 py-0.5 text-[11px] font-bold text-sage" title={`PayPal webhook: ${e.paypal_status ?? "confirmed"}`}>
-                        ✓ PayPal
-                      </span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {!ledger?.length && (
-                <tr>
-                  <td colSpan={5} className="px-4 py-6 text-slate">
-                    Nothing yet. Payments appear here once visits are confirmed.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+        <div className="mt-4">
+          <LedgerGrid
+            currency={p.currency}
+            fileName={`halodiary-ledger-${month.slice(0, 7)}.csv`}
+            rows={(ledger ?? []).map((e) => ({
+              id: e.id,
+              when: e.created_at,
+              whenLabel: fmt(e.created_at, p.timezone, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }),
+              what: LABEL[e.kind as string] ?? e.kind,
+              service: e.visits?.services?.name ?? "",
+              party: e.providers?.display_name ?? "",
+              amount: ["credit", "refund", "void"].includes(e.kind) ? -Number(e.amount) : Number(e.amount),
+              ref: e.paypal_ref ?? "",
+              mode: e.mode === "paypal_sandbox" ? "Sandbox" : "Simulated",
+              confirmed: e.paypal_confirmed_at ? "PayPal ✓" : e.mode === "paypal_sandbox" ? "Waiting" : "",
+              note: e.note ?? "",
+            }))}
+          />
         </div>
       </section>
     </div>
