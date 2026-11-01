@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { fmt } from "@/lib/time";
 import {
   acceptRefundAction,
+  invoiceRequestAction,
   demoProblemAction,
   offerRefundAction,
   reportProblemAction,
@@ -406,9 +407,35 @@ function Bubble({
             >
               {pending ? "Paying…" : `Pay ${money(Number(m.amount))} with ${paysWithPayPal ? "PayPal" : "PayPal (simulated)"}`}
             </button>
-          ) : (
-            <p className="mt-3 text-sm text-slate">Waiting for your client to pay.</p>
+          ) : null}
+          {as === "client" && m.status === "open" && paysWithPayPal && (
+            <div className="mt-2 text-center text-xs">
+              {typeof m.meta?.invoice_url === "string" ? (
+                <a href={m.meta.invoice_url} target="_blank" rel="noreferrer" className="font-bold text-[#003087] underline">
+                  Open the PayPal invoice
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  disabled={pending}
+                  className="font-bold text-slate underline hover:text-ink"
+                  onClick={() =>
+                    start(async () => {
+                      const r = await invoiceRequestAction(m.id);
+                      if (r && "error" in r && r.error) onError(r.error);
+                      else if (r && "url" in r && r.url) {
+                        onMerge([{ ...m, meta: { ...m.meta, invoice_url: r.url } }]);
+                        window.open(r.url, "_blank", "noopener");
+                      }
+                    })
+                  }
+                >
+                  Prefer an invoice? Get a PayPal invoice
+                </button>
+              )}
+            </div>
           )}
+          {as === "provider" && m.status === "open" && <p className="mt-3 text-sm text-slate">Waiting for your client to pay.</p>}
           <p className="mt-2 text-[11px] text-slate">{time}</p>
         </div>
       </li>

@@ -57,10 +57,10 @@ export type VisitRow = {
   moved_by: "client" | "provider" | null;
   providers?: { display_name: string; is_demo: boolean; paypal_email: string | null; avatar_hue: number; profile_id: string | null } | null;
   services?: { name: string } | null;
-  plans?: { check_hours: number } | null;
+  plans?: { check_hours: number; billing?: string } | null;
 };
 
-export const VISIT_SELECT = "*, providers(display_name, is_demo, paypal_email, avatar_hue, profile_id), services(name), plans(check_hours)";
+export const VISIT_SELECT = "*, providers(display_name, is_demo, paypal_email, avatar_hue, profile_id), services(name), plans(check_hours, billing)";
 
 
 export async function log(
@@ -158,11 +158,14 @@ export async function spentInMonth(supabase: SupabaseClient, profile: Profile, m
   const { start, end } = monthRange(month, profile.timezone);
   const { data } = await supabase
     .from("visits")
-    .select("price, status")
+    .select("price, status, plans(billing)")
     .eq("client_id", profile.id)
     .in("status", ["confirmed", "completed"])
     .gte("scheduled_at", start.toISOString())
     .lt("scheduled_at", end.toISOString());
+  // Services on a PayPal subscription count as their flat monthly price instead of visit by visit.
+  const { data: subs } = await supabase.from("plans").select("monthly_price").eq("client_id", profile.id).eq("billing", "subscription").eq("status", "active");
+  const subscribed = (subs ?? []).reduce((s, p) => s + Number(p.monthly_price ?? 0), 0);
   const { data: fees } = await supabase
     .from("ledger_entries")
     .select("amount, visits!inner(scheduled_at)")
@@ -170,7 +173,8 @@ export async function spentInMonth(supabase: SupabaseClient, profile: Profile, m
     .eq("kind", "fee")
     .gte("visits.scheduled_at", start.toISOString())
     .lt("visits.scheduled_at", end.toISOString());
-  return (data ?? []).reduce((s, v) => s + Number(v.price), 0) + (fees ?? []).reduce((s, f) => s + Number(f.amount), 0);
+  const perVisit = (data ?? []).filter((v) => (v.plans as unknown as { billing?: string } | null)?.billing !== "subscription");
+  return perVisit.reduce((s, v) => s + Number(v.price), 0) + (fees ?? []).reduce((s, f) => s + Number(f.amount), 0) + subscribed;
 }
 
 export async function forecastMonth(supabase: SupabaseClient, profile: Profile, month: string) {
@@ -179,15 +183,18 @@ export async function forecastMonth(supabase: SupabaseClient, profile: Profile, 
     .select("*, services(name), providers(display_name)")
     .eq("client_id", profile.id)
     .eq("status", "active");
-  const lines = ((plans ?? []) as (Plan & { services: { name: string }; providers: { display_name: string } })[]).map((p) => {
+  type P = Plan & { services: { name: string }; providers: { display_name: string }; billing?: string; monthly_price?: number | null };
+  const lines = ((plans ?? []) as P[]).map((p) => {
     const count = visitsInMonth(p, month, profile.timezone).length;
+    const subscribed = p.billing === "subscription" && p.monthly_price;
     return {
       planId: p.id,
       service: p.services?.name ?? p.service_id,
       provider: p.providers?.display_name ?? "",
       visits: count,
       price: Number(p.price),
-      total: count * Number(p.price),
+      total: subscribed ? Number(p.monthly_price) : count * Number(p.price),
+      subscription: Boolean(subscribed),
     };
   });
   const total = lines.reduce((s, l) => s + l.total, 0);
@@ -203,6 +210,11 @@ async function holdPayment(supabase: SupabaseClient, profile: Profile, v: VisitR
   const month = monthKey(new Date(v.scheduled_at), tz);
 
   const contract = await governingContract(supabase, await planIdForVisit(supabase, v));
+  if (v.plans?.billing === "subscription" && contract?.status !== "pending") {
+    await supabase.from("visits").update({ status: "confirmed", payment_mode: paypal.paypalConfigured() ? "paypal_sandbox" : "simulated" }).eq("id", v.id);
+    await log(supabase, profile.id, "system", `Confirmed ${v.services?.name}; covered by the monthly PayPal subscription`, { visit: v.id });
+    return true;
+  }
   if (contract && contract.status === "pending") {
     await notifyOnce(
       supabase,
@@ -285,6 +297,28 @@ export async function completeVisit(supabase: SupabaseClient, profile: Profile, 
   const fmtDay = (d: Date) => fmtDayZ(d, profile.timezone);
   const cur = profile.currency;
   const price = Number(v.price);
+
+  // Covered by the PayPal subscription: nothing to capture, just pay the provider their share.
+  if (v.plans?.billing === "subscription") {
+    const share = Math.round(price * (1 - COMMISSION) * 100) / 100;
+    const mode = (v.payment_mode as "paypal_sandbox" | "simulated") ?? "simulated";
+    let payoutId = `SIM-PAYOUT-${v.id.slice(0, 8).toUpperCase()}`;
+    if (mode === "paypal_sandbox" && paypal.paypalConfigured()) {
+      const receiver = v.providers?.paypal_email || process.env.PAYPAL_PAYOUT_RECEIVER;
+      if (receiver)
+        payoutId = await paypal
+          .payout({ receiver, amount: share, currency: cur, note: `${v.services?.name}, ${fmtDay(new Date(v.scheduled_at))}` })
+          .catch(() => payoutId);
+    }
+    await supabase.from("visits").update({ status: "completed" }).eq("id", v.id);
+    await supabase.from("ledger_entries").insert({ client_id: profile.id, visit_id: v.id, provider_id: v.provider_id, kind: "payout", amount: share, paypal_ref: payoutId, mode, note: "Covered by monthly PayPal subscription" });
+    await log(supabase, profile.id, actor, `Completed ${v.services?.name}; paid ${v.providers?.display_name} from the subscription`, { visit: v.id });
+    if (nowFor(profile).getTime() - new Date(v.scheduled_at).getTime() < 3 * 86_400_000) {
+      const { requestRating } = await import("./chat");
+      await requestRating(supabase, v, profile.timezone);
+    }
+    return;
+  }
 
   // Credits from late provider changes come off this provider's next payment.
   const { data: credits } = await supabase

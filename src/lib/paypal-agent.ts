@@ -101,3 +101,37 @@ export async function sendMonthlyStatement(supabase: SupabaseClient, profile: Pr
   await log(supabase, profile.id, "user", `Sent a PayPal statement for ${monthLabel(month)}`, { invoice: id, total });
   return { ok: true, invoiceId: id, total, lines: items.length };
 }
+
+/**
+ * Turn a provider's payment request in chat into a real PayPal invoice the client can pay on PayPal
+ * (card, PayPal balance or Pay Later where PayPal offers it). The webhook marks it paid in the chat.
+ */
+export async function invoiceForRequest(supabase: SupabaseClient, profile: Profile, messageId: string) {
+  const { data: m } = await supabase.from("messages").select("*, conversations!inner(client_id, provider_id, providers(display_name))").eq("id", messageId).maybeSingle();
+  if (!m || m.kind !== "payment_request" || m.status !== "open") return { error: "This request can't be invoiced." };
+  const conv = m.conversations as unknown as { client_id: string; provider_id: string; providers: { display_name: string } };
+  if (conv.client_id !== profile.id) return { error: "Not your conversation." };
+  if (m.meta?.invoice_url) return { ok: true, url: m.meta.invoice_url as string };
+  const email = profile.paypal_payer_email;
+  if (!email) return { error: "Approve a budget with PayPal first, so the invoice can go to your PayPal email." };
+  const cur = profile.currency;
+  const inv = await runPayPalTool<{ id?: string; href?: string }>("create_invoice", {
+    currency_code: cur,
+    invoice_date: new Date().toISOString().slice(0, 10),
+    note: `${conv.providers.display_name} via HaloDiary. Paying this invoice settles the request in your HaloDiary chat.`,
+    reference: `HaloDiary chat request ${m.id.slice(0, 8)}`,
+    invoicer_business_name: `HaloDiary for ${conv.providers.display_name}`.slice(0, 300),
+    primary_recipients: [{ billing_info: { email_address: email, name: { given_name: profile.full_name.split(" ")[0] || "Client", surname: profile.full_name.split(" ").slice(1).join(" ") || "HaloDiary" } } }],
+    items: [{ name: String(m.body).slice(0, 200), quantity: "1", unit_amount: { currency_code: cur, value: Number(m.amount).toFixed(2) } }],
+  });
+  const id = inv.id ?? inv.href?.split("/").pop();
+  if (!id) throw new Error("PayPal did not return an invoice id");
+  const sent = await runPayPalTool<{ href?: string; links?: { href: string; rel: string }[] }>("send_invoice", { invoice_id: id, send_to_recipient: true });
+  const url =
+    sent.href && sent.href.includes("/invoice/p/")
+      ? sent.href
+      : (sent.links?.find((l) => l.rel === "payer-view")?.href ?? `https://www.${process.env.PAYPAL_ENV === "live" ? "" : "sandbox."}paypal.com/invoice/p/#${id}`);
+  await supabase.from("messages").update({ meta: { ...(m.meta ?? {}), invoice_id: id, invoice_url: url } }).eq("id", m.id);
+  await log(supabase, profile.id, "user", `Asked for a PayPal invoice for ${m.body}`, { invoice: id });
+  return { ok: true, url, invoiceId: id };
+}

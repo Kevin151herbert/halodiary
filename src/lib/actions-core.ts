@@ -167,6 +167,11 @@ export async function setPlanStatus(supabase: SupabaseClient, profile: Profile, 
       .in("status", ["scheduled", "awaiting", "confirmed"]);
     kept = count ?? 0;
     if (status === "ended" && contract) await supabase.from("contracts").update({ status: "terminated" }).eq("id", contract.id);
+    if (status === "ended" && plan.paypal_subscription_id && plan.billing === "subscription") {
+      const { cancelSubscription } = await import("./paypal");
+      await cancelSubscription(plan.paypal_subscription_id, "Service ended in HaloDiary").catch(() => undefined);
+      await supabase.from("plans").update({ billing: "per_visit", subscription_status: "CANCELLED" }).eq("id", planId);
+    }
   }
   const verb = status === "active" ? "Resumed" : status === "paused" ? "Paused" : "Ended";
   await log(supabase, profile.id, actor, `${verb} ${plan.services?.name}${kept ? `; ${kept} visit${kept === 1 ? "" : "s"} inside the notice period still go ahead` : ""}`, {

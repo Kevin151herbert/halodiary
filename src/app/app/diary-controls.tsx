@@ -2,7 +2,15 @@
 
 import { useState, useTransition } from "react";
 import { btn, field } from "@/components/ui";
-import { markNotificationReadAction, planStatusAction, providerAction, respondAction, setClockAction } from "./actions";
+import {
+  markNotificationReadAction,
+  planStatusAction,
+  providerAction,
+  respondAction,
+  setClockAction,
+  startSubscriptionAction,
+  stopSubscriptionAction,
+} from "./actions";
 
 // Times typed here are wall-clock times in the user's own time zone; the server reads them that way.
 export function VisitAnswer({
@@ -163,5 +171,68 @@ export function DemoClock({ offsetHours }: { offsetHours: number }) {
         )}
       </div>
     </section>
+  );
+}
+
+/** Switch a service between paying per visit and a flat monthly PayPal subscription. */
+export function BillingControls({
+  planId,
+  billing,
+  status,
+  monthly,
+  suggested,
+  currency,
+  paypalReady,
+}: {
+  planId: string;
+  billing: string;
+  status: string | null;
+  monthly: number | null;
+  suggested: number;
+  currency: string;
+  paypalReady: boolean;
+}) {
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const money = (n: number) => new Intl.NumberFormat("en-GB", { style: "currency", currency, maximumFractionDigits: 0 }).format(n);
+  if (!paypalReady) return null;
+  if (billing === "subscription")
+    return (
+      <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+        <span className="rounded-full bg-[#ffc439]/40 px-2.5 py-1 font-bold text-[#003087]">PayPal subscription · {money(Number(monthly))}/mo</span>
+        <button
+          className="font-bold text-slate underline hover:text-ink"
+          disabled={pending}
+          onClick={() => {
+            if (confirm("Cancel the PayPal subscription and go back to paying per visit?"))
+              start(async () => {
+                const r = await stopSubscriptionAction(planId);
+                if (r && "error" in r && r.error) setError(r.error);
+              });
+          }}
+        >
+          Pay per visit instead
+        </button>
+        {error && <span className="text-rose">{error}</span>}
+      </div>
+    );
+  return (
+    <div className="mt-3 text-xs">
+      <button
+        className="rounded-full bg-[#ffc439] px-3 py-1.5 font-bold text-[#003087] shadow-[0_6px_12px_-6px_rgba(255,170,0,0.7)] hover:brightness-95 disabled:opacity-50"
+        disabled={pending}
+        onClick={() =>
+          start(async () => {
+            const r = await startSubscriptionAction(planId);
+            if (r && "approveUrl" in r && r.approveUrl) window.location.href = r.approveUrl;
+            else setError((r as { error?: string })?.error ?? "PayPal couldn't start the subscription.");
+          })
+        }
+      >
+        {pending ? "Opening PayPal…" : `Pay ${money(suggested)}/mo flat with PayPal (5% off)`}
+      </button>
+      {status === "APPROVAL_PENDING" && <span className="ml-2 text-slate">Waiting for your PayPal approval.</span>}
+      {error && <p className="mt-1 text-rose">{error}</p>}
+    </div>
   );
 }

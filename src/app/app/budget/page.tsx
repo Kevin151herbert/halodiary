@@ -4,6 +4,7 @@ import { paypalConfigured } from "@/lib/paypal";
 import { getSession } from "@/lib/supabase/server";
 import { fmt, monthLabel } from "@/lib/time";
 import { SimulatedApprove } from "./simulated-approve";
+import { PayPalV6Button } from "./paypal-v6-button";
 import { StatementButton } from "./statement-button";
 import { LedgerGrid } from "@/components/ledger-grid";
 
@@ -104,7 +105,7 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
                     <span className="font-bold">{l.service}</span> <span className="text-slate">{l.provider}</span>
                   </td>
                   <td className="py-2.5 text-right">{l.visits}</td>
-                  <td className="py-2.5 text-right">{money(l.price, p.currency)}</td>
+                  <td className="py-2.5 text-right">{l.subscription ? <span className="text-xs font-bold text-[#003087]">PayPal monthly</span> : money(l.price, p.currency)}</td>
                   <td className="py-2.5 text-right font-bold">{money(l.total, p.currency)}</td>
                 </tr>
               ))}
@@ -169,6 +170,12 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
               </p>
               <div className="mt-6 space-y-3">
                 {realPayPal && (
+                  forecast.lines.length ? (
+                    <PayPalV6Button
+                      month={month}
+                      cap={forecast.cap}
+                      currency={p.currency}
+                      fallback={
                   <form action="/api/paypal/start" method="post">
                     <input type="hidden" name="month" value={month} />
                     <input type="hidden" name="cap" value={forecast.cap} />
@@ -176,6 +183,17 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
                       Approve with PayPal
                     </button>
                   </form>
+                      }
+                    />
+                  ) : (
+                  <form action="/api/paypal/start" method="post">
+                    <input type="hidden" name="month" value={month} />
+                    <input type="hidden" name="cap" value={forecast.cap} />
+                    <button disabled={!forecast.lines.length} className="w-full rounded-full bg-[#ffc439] px-5 py-3.5 font-bold text-[#003087] shadow-[0_12px_22px_-8px_rgba(255,170,0,0.7),inset_1px_2px_2px_rgba(255,255,255,0.6)] hover:brightness-95 disabled:opacity-50">
+                      Approve with PayPal
+                    </button>
+                  </form>
+                  )
                 )}
                 <SimulatedApprove month={month} cap={forecast.cap} disabled={!forecast.lines.length} primary={!realPayPal} />
               </div>

@@ -5,7 +5,9 @@ import { redirect } from "next/navigation";
 import * as core from "@/lib/actions-core";
 import * as chat from "@/lib/chat";
 import * as problems from "@/lib/problems";
-import { sendMonthlyStatement } from "@/lib/paypal-agent";
+import { invoiceForRequest, sendMonthlyStatement } from "@/lib/paypal-agent";
+import * as subs from "@/lib/subscriptions";
+import { headers } from "next/headers";
 import { log } from "@/lib/engine";
 import { getSession } from "@/lib/supabase/server";
 
@@ -258,5 +260,38 @@ export async function sendStatementAction(month: string) {
     return res;
   } catch (e) {
     return { error: e instanceof Error ? e.message : "PayPal couldn't create the statement." };
+  }
+}
+
+// ---------- PayPal Subscriptions ----------
+
+export async function startSubscriptionAction(planId: string) {
+  const { supabase, profile } = await session();
+  const h = await headers();
+  const origin = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}`;
+  try {
+    return await subs.startSubscription(supabase, profile, planId, origin);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "PayPal couldn't start the subscription." };
+  }
+}
+
+export async function stopSubscriptionAction(planId: string) {
+  const { supabase, profile } = await session();
+  try {
+    const r = await subs.stopSubscription(supabase, profile, planId);
+    done();
+    return r;
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "PayPal couldn't cancel the subscription." };
+  }
+}
+
+export async function invoiceRequestAction(messageId: string) {
+  const { supabase, profile } = await session();
+  try {
+    return await invoiceForRequest(supabase, profile, messageId);
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "PayPal couldn't create the invoice." };
   }
 }

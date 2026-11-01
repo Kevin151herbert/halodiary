@@ -6,10 +6,12 @@ import { forecastMonth, MINUTES_SAVED_PER_VISIT, monthKey, nowFor } from "@/lib/
 import { getSession } from "@/lib/supabase/server";
 import { addDays, dayKey as dayKeyZ, fmt, fmtDay as fmtDayZ, fmtTime as fmtTimeZ, localInputValue, zonedTime, zParts } from "@/lib/time";
 import { openChatAction } from "./actions";
-import { DemoClock, PlanControls, ProposalAnswer, VisitAnswer } from "./diary-controls";
+import { BillingControls, DemoClock, PlanControls, ProposalAnswer, VisitAnswer } from "./diary-controls";
+import { paypalConfigured } from "@/lib/paypal";
+import { monthlyPriceFor } from "@/lib/subscriptions";
 
-export default async function DiaryPage({ searchParams }: { searchParams: Promise<{ added?: string }> }) {
-  const { added } = await searchParams;
+export default async function DiaryPage({ searchParams }: { searchParams: Promise<{ added?: string; subscription?: string }> }) {
+  const { added, subscription } = await searchParams;
   const { supabase, profile } = await getSession();
   const p = profile!;
   const now = nowFor(p);
@@ -99,6 +101,8 @@ export default async function DiaryPage({ searchParams }: { searchParams: Promis
             {needsAnswer.length ? `${needsAnswer.length} ${needsAnswer.length === 1 ? "visit needs" : "visits need"} a quick answer` : "Everything is on track"}
           </h1>
           {added && <p className="mt-2 font-bold text-sage">Added to your diary. The first visits are below.</p>}
+          {subscription === "active" && <p className="mt-2 font-bold text-sage">PayPal subscription active. Visits on that service are now covered by one monthly payment.</p>}
+          {subscription && subscription !== "active" && <p className="mt-2 text-sm text-rose">PayPal subscription not active ({subscription}).</p>}
         </div>
         <div className="flex gap-4 text-right">
           <div className="clay-sm px-5 py-3">
@@ -271,6 +275,17 @@ export default async function DiaryPage({ searchParams }: { searchParams: Promis
                       <button className="font-bold hover:text-ink">Chat</button>
                     </form>
                   </div>
+                  {pl.status === "active" && (
+                    <BillingControls
+                      planId={pl.id}
+                      billing={pl.billing}
+                      status={pl.subscription_status}
+                      monthly={pl.monthly_price}
+                      suggested={monthlyPriceFor(pl)}
+                      currency={currency}
+                      paypalReady={paypalConfigured()}
+                    />
+                  )}
                 </Card>
               </li>
             );
