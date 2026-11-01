@@ -1,11 +1,23 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { btn } from "@/components/ui";
+import { btn, field } from "@/components/ui";
 import { markNotificationReadAction, planStatusAction, providerAction, respondAction, setClockAction } from "./actions";
 
 // Times typed here are wall-clock times in the user's own time zone; the server reads them that way.
-export function VisitAnswer({ visitId, suggested }: { visitId: string; suggested: string }) {
+export function VisitAnswer({
+  visitId,
+  suggested,
+  skipFee,
+  moveFee,
+  lateNote,
+}: {
+  visitId: string;
+  suggested: string;
+  skipFee?: string | null;
+  moveFee?: string | null;
+  lateNote?: string | null;
+}) {
   const [pending, start] = useTransition();
   const [moving, setMoving] = useState(false);
   const [when, setWhen] = useState(suggested);
@@ -25,10 +37,16 @@ export function VisitAnswer({ visitId, suggested }: { visitId: string; suggested
             Proceed
           </button>
           <button className={btn.ghost} disabled={pending} onClick={() => setMoving(true)}>
-            Move it
+            Move it{moveFee ? ` (${moveFee} late fee)` : ""}
           </button>
-          <button className={btn.ghost} disabled={pending} onClick={() => run("skip")}>
-            Skip this one
+          <button
+            className={btn.ghost}
+            disabled={pending}
+            onClick={() => {
+              if (!skipFee || confirm(`Skipping now costs a ${skipFee} late fee under your agreement. Skip anyway?`)) run("skip");
+            }}
+          >
+            Skip this one{skipFee ? ` (${skipFee} late fee)` : ""}
           </button>
         </div>
       ) : (
@@ -41,16 +59,17 @@ export function VisitAnswer({ visitId, suggested }: { visitId: string; suggested
             type="datetime-local"
             value={when}
             onChange={(e) => setWhen(e.target.value)}
-            className="rounded-full border border-mist px-4 py-2 text-sm"
+            className={`${field} w-auto rounded-full`}
           />
           <button className={btn.primary} disabled={pending} onClick={() => run("reschedule", when)}>
-            Move visit
+            Move visit{moveFee ? ` (${moveFee} fee)` : ""}
           </button>
           <button className={btn.quiet} onClick={() => setMoving(false)}>
             Cancel
           </button>
         </div>
       )}
+      {lateNote && <p className="mt-2 text-xs text-slate">Inside the agreement&apos;s notice window: {lateNote}.</p>}
       {error && <p className="mt-2 text-sm text-rose">{error}</p>}
     </div>
   );
@@ -65,7 +84,7 @@ export function ProposalAnswer({ notificationId, visitId, newTime }: { notificat
         disabled={pending}
         onClick={() =>
           start(async () => {
-            await respondAction(visitId, "reschedule", newTime);
+            await respondAction(visitId, "reschedule", newTime, true);
             await markNotificationReadAction(notificationId);
           })
         }
@@ -105,7 +124,8 @@ export function PlanControls({ planId, status }: { planId: string; status: strin
         className={btn.quiet}
         disabled={pending}
         onClick={() => {
-          if (confirm("End this service? Future visits that are not confirmed will be removed.")) start(() => planStatusAction(planId, "ended"));
+          if (confirm("End this service? Visits inside the agreement's notice period still go ahead; later ones are removed."))
+            start(() => planStatusAction(planId, "ended"));
         }}
       >
         End
@@ -118,7 +138,7 @@ export function PlanControls({ planId, status }: { planId: string; status: strin
 export function DemoClock({ offsetHours }: { offsetHours: number }) {
   const [pending, start] = useTransition();
   return (
-    <section aria-labelledby="clock" className="rounded-2xl border border-dashed border-ink/25 p-5">
+    <section aria-labelledby="clock" className="clay-inset p-5 sm:p-6">
       <h2 id="clock" className="font-bold">
         Demo clock
       </h2>

@@ -26,7 +26,7 @@ export default async function ActivityPage() {
         {(data ?? []).map((a) => {
           const [label, cls] = actorLabel[a.actor] ?? [a.actor, "bg-mist"];
           return (
-            <li key={a.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-xl border border-mist bg-card px-4 py-3">
+            <li key={a.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 clay-sm px-4 py-3">
               <span className="w-32 shrink-0 text-sm text-slate">
                 {fmt(a.created_at, profile!.timezone, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
               </span>

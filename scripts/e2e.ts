@@ -2,7 +2,9 @@
 // Run: npx tsx --env-file=.env.local scripts/e2e.ts
 import { createClient } from "@supabase/supabase-js";
 import * as core from "../src/lib/actions-core";
-import { advance, forecastMonth, monthKey, nowFor } from "../src/lib/engine";
+import { attendanceFor } from "../src/lib/attendance";
+import { governingContract } from "../src/lib/contract";
+import { advance, forecastMonth, monthKey, nowFor, VISIT_SELECT, type VisitRow } from "../src/lib/engine";
 import type { Profile } from "../src/lib/supabase/server";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -53,6 +55,12 @@ async function main() {
     const r = await core.createPlan(supabase, p, { providerId: prov.provider_id, serviceId: prov.service_id, cadence, weekdays: [...weekdays], time }, "user");
     check(`add ${prov.service_name}`, !("error" in r && r.error), "summary" in r ? r.summary : (r as { error: string }).error);
   }
+  const { data: contracts } = await supabase.from("contracts").select("status, client_signed_at, provider_signed_at, terms, terms_hash").eq("client_id", uid);
+  check(
+    "each service has a signed agreement, demo providers sign at once",
+    contracts?.length === 3 && contracts.every((c) => c.status === "active" && c.client_signed_at && c.provider_signed_at && c.terms_hash.length === 64),
+    `${contracts?.length} agreements`,
+  );
   const visits0 = await core.upcomingVisits(supabase, p, 14);
   check("visits generated for next two weeks", visits0.length >= 14, `${visits0.length} visits`);
   const tenAm = visits0.find((v) => v.services?.name === "Cleaning");
@@ -126,6 +134,79 @@ async function main() {
   const after = (await supabase.from("notifications").select("id", { count: "exact", head: true }).eq("user_id", uid)).count;
   check("no duplicate notifications on repeat loads", before === after, `${before} then ${after}`);
 
+  // ---- Agreements in action ----
+  const setClockTo = async (target: Date) => {
+    const hours = Math.ceil((target.getTime() - Date.now()) / 3_600_000);
+    await supabase.from("profiles").update({ clock_offset_hours: hours }).eq("id", uid);
+    p = await profileOf();
+  };
+  const cleaningPlan = (await supabase.from("plans").select("id").eq("client_id", uid).eq("service_id", "cleaning").single()).data!;
+  const futureCleans = async () =>
+    ((await supabase.from("visits").select(VISIT_SELECT).eq("plan_id", cleaningPlan.id).eq("status", "scheduled").order("scheduled_at")).data ?? []) as VisitRow[];
+  let [c1] = await futureCleans();
+  for (const m of [0, 1, 2]) await core.approveBudget(supabase, p, { month: monthKey(new Date(c1.scheduled_at), p.timezone, m), cap: 5000, mode: "simulated" }, "user");
+
+  // Client skips 10 hours before: inside the 24h notice, so the 50% late fee is charged and paid on.
+  await setClockTo(new Date(new Date(c1.scheduled_at).getTime() - 10 * 3_600_000));
+  await advance(supabase, p);
+  c1 = (await supabase.from("visits").select(VISIT_SELECT).eq("id", c1.id).single()).data as VisitRow;
+  const cost = await core.changeCost(supabase, p, c1, "skip");
+  check("late skip is priced under the agreement", cost.late && Math.abs(cost.fee - Number(c1.price) / 2) < 0.01, JSON.stringify(cost));
+  await core.clientRespond(supabase, p, { visitId: c1.id, action: "skip" }, "user");
+  const { data: fee } = await supabase.from("ledger_entries").select("kind, amount").eq("visit_id", c1.id).in("kind", ["fee", "payout"]);
+  check(
+    "late fee charged and 90% paid to the provider",
+    fee?.length === 2 && Math.abs(Number(fee.find((e) => e.kind === "fee")!.amount) - Number(c1.price) / 2) < 0.01,
+    JSON.stringify(fee),
+  );
+
+  // Provider cancels the next cleaning 10 hours before: the client gets a full credit and the reason.
+  let [c2, c3] = await futureCleans();
+  await setClockTo(new Date(new Date(c2.scheduled_at).getTime() - 10 * 3_600_000));
+  await advance(supabase, p);
+  const pc = (await core.providerRespond(supabase, p, { visitId: c2.id, action: "cancel", reason: "Van broke down" }, "user")) as { error?: string };
+  c2 = (await supabase.from("visits").select(VISIT_SELECT).eq("id", c2.id).single()).data as VisitRow;
+  const { data: credit } = await supabase.from("ledger_entries").select("amount, settled_at").eq("visit_id", c2.id).eq("kind", "credit");
+  check("provider cancellation cancels the visit and releases its hold", !pc.error && c2.status === "cancelled", c2.status);
+  check("late provider cancellation credits the client 100%", credit?.length === 1 && Math.abs(Number(credit[0].amount) - Number(c2.price)) < 0.01, JSON.stringify(credit));
+  const att = await attendanceFor(supabase, c2.provider_id, nowFor(p).toISOString());
+  check("attendance shows the cancellation with its reason", att.items.some((i) => i.yours && i.outcome === "cancelled" && i.note === "Van broke down"), `${Math.round(att.rate * 100)}% of ${att.total}`);
+
+  // The credit comes off the next payment to that provider.
+  await setClockTo(new Date(new Date(c3.scheduled_at).getTime() + 4 * 3_600_000));
+  await advance(supabase, p);
+  c3 = (await supabase.from("visits").select(VISIT_SELECT).eq("id", c3.id).single()).data as VisitRow;
+  const { data: cap3 } = await supabase.from("ledger_entries").select("kind, amount").eq("visit_id", c3.id).eq("kind", "capture");
+  const { data: settled } = await supabase.from("ledger_entries").select("settled_at").eq("visit_id", c2.id).eq("kind", "credit");
+  check(
+    "next visit completes with the credit deducted",
+    c3.status === "completed" && cap3?.length === 1 && Number(cap3[0].amount) < Number(c3.price) && !!settled?.[0]?.settled_at,
+    `${c3.status}, charged ${cap3?.[0]?.amount} of ${c3.price}`,
+  );
+
+  // Changing the terms creates version 2; the demo provider signs straight away.
+  const am = (await core.proposeAmendment(supabase, p, { planId: cleaningPlan.id, terms: { late_cancellation_fee_pct: 25, cancellation_notice_hours: 48 } }, "user")) as { active?: boolean; version?: number; error?: string };
+  const now2 = await governingContract(supabase, cleaningPlan.id);
+  const { data: hist } = await supabase.from("contracts").select("version, status").eq("plan_id", cleaningPlan.id).order("version");
+  check(
+    "amendment becomes version 2 in force, version 1 kept as history",
+    !!am.active && now2?.version === 2 && now2.terms.late_cancellation_fee_pct === 25 && hist?.[0]?.status === "superseded",
+    am.error ?? JSON.stringify(hist),
+  );
+  const { data: planRow } = await supabase.from("plans").select("check_hours").eq("id", cleaningPlan.id).single();
+  check("reminder moves ahead of the new notice window", (planRow?.check_hours ?? 0) >= 60, `${planRow?.check_hours}h`);
+
+  // Ending tutoring keeps visits inside the 7-day notice and drops the rest.
+  const tutorPlan = (await supabase.from("plans").select("id").eq("client_id", uid).eq("service_id", "tutoring").single()).data!;
+  const ended = (await core.setPlanStatus(supabase, p, tutorPlan.id, "ended", "user")) as { kept?: number };
+  const { data: tv } = await supabase.from("visits").select("scheduled_at, status").eq("plan_id", tutorPlan.id).in("status", ["scheduled", "awaiting", "confirmed"]);
+  const limit = nowFor(p).getTime() + 7 * 86_400_000 + 60_000;
+  check(
+    "ending a service honours the termination notice",
+    (ended.kept ?? 0) > 0 && (tv ?? []).every((v) => new Date(v.scheduled_at).getTime() <= limit),
+    `${ended.kept} kept`,
+  );
+
   // Activity log has user and system entries
   const { data: act } = await supabase.from("activity_log").select("actor").eq("user_id", uid);
   const actors = new Set((act ?? []).map((a) => a.actor));
@@ -134,7 +215,7 @@ async function main() {
   // Privacy: a second user sees none of this
   const other = await anon.auth.signUp({ email: `judge-${id}b@halodiary.app`, password: crypto.randomUUID() });
   const s2 = createClient(url, key, { auth: { persistSession: false }, global: { headers: { Authorization: `Bearer ${other.data.session!.access_token}` } } });
-  const leaks = await Promise.all(["plans", "visits", "ledger_entries", "budgets", "notifications", "activity_log"].map(async (t) => (await s2.from(t).select("*", { count: "exact", head: true })).count ?? 0));
+  const leaks = await Promise.all(["plans", "visits", "ledger_entries", "budgets", "notifications", "activity_log", "contracts"].map(async (t) => (await s2.from(t).select("*", { count: "exact", head: true })).count ?? 0));
   check("another user sees none of this user's data", leaks.every((n) => n === 0), leaks.join(","));
   const fresh = createClient(url, key, { auth: { persistSession: false } });
   const anonView = await fresh.from("providers").select("id", { count: "exact", head: true });

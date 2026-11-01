@@ -117,9 +117,10 @@ export async function authorizeWithVault(opts: {
   return { orderId: order.id, authorizationId: authId };
 }
 
-export async function captureAuthorization(authorizationId: string) {
+export async function captureAuthorization(authorizationId: string, partial?: { amount: number; currency: string }) {
   const json = await call<{ id: string; status: string }>(`/v2/payments/authorizations/${authorizationId}/capture`, {
     final_capture: true,
+    ...(partial ? { amount: money(partial.amount, partial.currency) } : {}),
   });
   return json.id;
 }

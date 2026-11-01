@@ -39,23 +39,23 @@ export default function Landing() {
             </ButtonLink>
             <DemoLoginButton />
           </div>
-          <dl className="mt-12 grid max-w-lg grid-cols-3 gap-6 border-t border-mist pt-6">
-            <div>
-              <dt className="text-sm text-slate">Bookings a year, typical busy home</dt>
+          <dl className="mt-12 grid max-w-lg grid-cols-3 gap-3 sm:gap-4">
+            <div className="clay-sm flex flex-col-reverse justify-end p-4">
+              <dt className="mt-1 text-xs leading-snug text-slate">Bookings a year, typical busy home</dt>
               <dd className="font-display text-3xl font-extrabold">400</dd>
             </div>
-            <div>
-              <dt className="text-sm text-slate">Payment approvals a month</dt>
+            <div className="clay-sm flex flex-col-reverse justify-end p-4">
+              <dt className="mt-1 text-xs leading-snug text-slate">Payment approvals a month</dt>
               <dd className="font-display text-3xl font-extrabold">1</dd>
             </div>
-            <div>
-              <dt className="text-sm text-slate">Questions you answer per visit</dt>
+            <div className="clay-sm flex flex-col-reverse justify-end p-4">
+              <dt className="mt-1 text-xs leading-snug text-slate">Questions you answer per visit</dt>
               <dd className="font-display text-3xl font-extrabold">0 or 1</dd>
             </div>
           </dl>
         </section>
 
-        <section aria-label="A week on HaloDiary" className="rounded-[2rem] border border-mist bg-card p-6 sm:p-8">
+        <section aria-label="A week on HaloDiary" className="clay p-6 sm:p-8">
           <div className="flex items-baseline justify-between">
             <h2 className="text-xl font-bold">This week</h2>
             <span className="text-sm text-slate">9 visits, all confirmed</span>
@@ -73,24 +73,24 @@ export default function Landing() {
               </li>
             ))}
           </ol>
-          <div className="mt-8 rounded-2xl bg-paper p-5">
+          <div className="clay-inset mt-8 p-5">
             <p className="text-sm text-slate">Tomorrow, 10:00</p>
             <p className="mt-1 font-display text-lg font-bold">Cleaning with Amara S.</p>
             <p className="mt-1 text-sm text-slate">Amara has confirmed. Go ahead as planned?</p>
             <div className="mt-4 flex flex-wrap gap-2">
-              <span className="rounded-full bg-ink px-4 py-1.5 text-sm font-bold text-white">Proceed</span>
-              <span className="rounded-full border border-mist bg-card px-4 py-1.5 text-sm font-bold">Move it</span>
-              <span className="rounded-full border border-mist bg-card px-4 py-1.5 text-sm font-bold">Skip</span>
+              <span className="clay-btn-ink rounded-full px-4 py-2 text-sm font-bold">Proceed</span>
+              <span className="clay-btn-ghost rounded-full px-4 py-2 text-sm font-bold">Move it</span>
+              <span className="clay-btn-ghost rounded-full px-4 py-2 text-sm font-bold">Skip</span>
             </div>
           </div>
-          <div className="mt-4 flex items-center justify-between rounded-2xl border border-dashed border-mist p-5 text-sm">
+          <div className="mt-4 flex items-center justify-between clay-inset p-5 text-sm">
             <span>November budget, approved with PayPal</span>
             <span className="font-bold">€640 cap</span>
           </div>
         </section>
       </main>
 
-      <footer className="flex flex-col gap-2 border-t border-mist py-6 text-sm text-slate sm:flex-row sm:justify-between">
+      <footer className="flex flex-col gap-2 py-6 text-sm text-slate sm:flex-row sm:justify-between">
         <span>Built for the PayPal AI Hackathon. Payments run in the PayPal sandbox; no real money moves.</span>
         <span>Demo providers are generated and appear around your location.</span>
       </footer>

@@ -12,11 +12,12 @@ Built for the PayPal AI Hackathon (Devpost, November 2026).
 
 1. Open the live demo and press **Try it instantly** (or create an account).
 2. Allow location, or pick a city. Every judge sees a full marketplace of providers with ratings and reviews around wherever they are.
-3. In **Discover**, pick a service and provider, choose a cadence and add it to the diary. Or open the assistant and type a routine, for example *"cleaning twice a week and a dog walker on weekends under €20 a walk"*.
+3. In **Discover**, pick a service and provider. Tap the provider to see their **attendance**: a ring with the share of booked visits rendered (green), moved to an alternative time (yellow) or cancelled (red), and one dot per visit. Hover or tap a red dot to read the reason. Choose a cadence, set the **service agreement** terms (free-change window, late fee, free late moves, notice to end, reminder timing, price lock), sign, and add it to the diary. Or open the assistant and type a routine, for example *"cleaning twice a week and a dog walker on weekends under €20 a walk"*.
 4. In **Budget**, approve the month with PayPal (sandbox) or with the simulated button.
 5. On the **Diary**, use the **demo clock** (+1 day) to watch day-before checks arrive. Proceed, move, or skip a visit.
 6. Open **Provider view** to answer as the provider, propose a new time, or mark a visit done. The ledger shows the hold, the charge and the provider payout with PayPal references.
-7. **Activity** shows every action and who took it: you, the assistant, or the scheduler.
+7. **Agreements** lists every signed agreement with its clauses, both signatures, a fingerprint of the signed terms and the version history. Propose a change and it becomes a new version once both sides sign. The scheduler enforces the terms: a late skip charges the agreed fee through PayPal and pays it on to the provider; a late provider move or cancellation credits the client, and the credit comes off the next payment; ending a service keeps the visits inside the notice period.
+8. **Activity** shows every action and who took it: you, the assistant, or the scheduler.
 
 ## How PayPal is used
 

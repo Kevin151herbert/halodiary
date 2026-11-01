@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { AttendanceBadge } from "@/components/attendance";
 import { Avatar, Card, money, Rating } from "@/components/ui";
+import { attendanceRates } from "@/lib/attendance";
 import { cadenceLabel } from "@/lib/cadence";
 import { searchProviders } from "@/lib/actions-core";
 import { getSession } from "@/lib/supabase/server";
@@ -15,6 +17,7 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Sea
   const sorted = [...results].sort((a, b) =>
     sort === "rating" ? Number(b.rating) - Number(a.rating) || a.distance_km - b.distance_km : sort === "price" ? Number(a.price) - Number(b.price) : a.distance_km - b.distance_km,
   );
+  const rates = await attendanceRates(supabase, [...new Set(results.map((r) => r.provider_id))]);
   const current = services?.find((s) => s.id === service);
   const currency = profile!.currency;
 
@@ -41,7 +44,7 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Sea
       <nav aria-label="Services" className="mt-8 flex gap-2 overflow-x-auto pb-2">
         <Link
           href={qs({ service: undefined })}
-          className={`shrink-0 rounded-full border px-4 py-1.5 text-sm font-bold ${!service ? "border-ink bg-ink text-white" : "border-mist bg-card"}`}
+          className={`shrink-0 rounded-full px-4 py-2 text-sm font-bold ${!service ? "clay-btn-ink" : "clay-btn-ghost"}`}
         >
           All
         </Link>
@@ -49,7 +52,7 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Sea
           <Link
             key={s.id}
             href={qs({ service: s.id })}
-            className={`shrink-0 rounded-full border px-4 py-1.5 text-sm font-bold ${service === s.id ? "border-ink bg-ink text-white" : "border-mist bg-card"}`}
+            className={`shrink-0 rounded-full px-4 py-2 text-sm font-bold ${service === s.id ? "clay-btn-ink" : "clay-btn-ghost"}`}
           >
             {s.name}
           </Link>
@@ -59,7 +62,7 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Sea
       <div className="mt-4 flex items-center gap-2 text-sm">
         <span className="text-slate">Sort by</span>
         {(["distance", "rating", "price"] as const).map((k) => (
-          <Link key={k} href={qs({ sort: k })} className={`rounded-full px-3 py-1 font-bold capitalize ${sort === k ? "bg-mist text-ink" : "text-slate"}`}>
+          <Link key={k} href={qs({ sort: k })} className={`rounded-full px-3.5 py-1.5 font-bold capitalize ${sort === k ? "clay-inset text-ink" : "text-slate hover:text-ink"}`}>
             {k}
           </Link>
         ))}
@@ -71,12 +74,12 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Sea
           <p className="mt-1 text-slate">Try another service, or ask the assistant to widen the search.</p>
         </Card>
       ) : (
-        <ul className="mt-6 grid gap-3 sm:grid-cols-2">
+        <ul className="mt-6 grid gap-4 sm:grid-cols-2">
           {sorted.map((r) => (
             <li key={`${r.provider_id}-${r.service_id}`}>
               <Link
                 href={`/app/providers/${r.provider_id}?service=${r.service_id}`}
-                className="flex h-full gap-4 rounded-2xl border border-mist bg-card p-4 transition hover:border-ink/40"
+                className="clay flex h-full gap-4 p-5"
               >
                 <Avatar name={r.display_name} hue={r.avatar_hue} />
                 <div className="min-w-0 flex-1">
@@ -93,6 +96,7 @@ export default async function DiscoverPage({ searchParams }: { searchParams: Sea
                   <p className="mt-2 line-clamp-1 text-sm">{r.headline}</p>
                   <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-slate">
                     <Rating value={r.rating} count={r.review_count} />
+                    {rates.has(r.provider_id) && <AttendanceBadge rate={rates.get(r.provider_id)!} />}
                     <span>{r.distance_km.toFixed(1)} km away</span>
                     <span>Replies in {r.responds_within_hours}h</span>
                     {r.verified && <span className="font-bold text-sage">ID checked</span>}

@@ -41,7 +41,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
     router.refresh();
   }
 
-  const field = "mt-1 w-full rounded-xl border border-mist bg-card px-4 py-3 text-base outline-none focus:border-ink";
+  const field = "mt-1 w-full clay-sm px-4 py-3 text-base outline-none focus:border-ink";
 
   return (
     <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-5 py-10">
@@ -67,7 +67,7 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
                 ).map(([value, title, sub]) => (
                   <label
                     key={value}
-                    className={`cursor-pointer rounded-xl border p-3 ${role === value ? "border-ink bg-card" : "border-mist bg-card/60"}`}
+                    className={`cursor-pointer rounded-2xl p-3 transition ${role === value ? "clay-sm ring-2 ring-halo" : "clay-inset"}`}
                   >
                     <input type="radio" name="role" value={value} checked={role === value} onChange={() => setRole(value)} className="sr-only" />
                     <span className="block font-bold">{title}</span>

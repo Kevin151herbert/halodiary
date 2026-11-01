@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { AttendanceCard } from "@/components/attendance";
 import { Avatar, Card, money, Rating } from "@/components/ui";
+import { attendanceFor } from "@/lib/attendance";
+import { nowFor } from "@/lib/engine";
 import { cadenceLabel } from "@/lib/cadence";
 import { searchProviders } from "@/lib/actions-core";
 import { getSession } from "@/lib/supabase/server";
@@ -21,6 +24,7 @@ export default async function ProviderPage({ params, searchParams }: { params: P
     .order("created_at", { ascending: false })
     .limit(6);
   const near = await searchProviders(supabase, profile!, { radiusKm: 50 });
+  const attendance = await attendanceFor(supabase, id, nowFor(profile!).toISOString());
   const distance = near.results.find((r) => r.provider_id === id)?.distance_km;
 
   type Offer = { price: number; services: { id: string; name: string; default_cadence: string } };
@@ -29,7 +33,7 @@ export default async function ProviderPage({ params, searchParams }: { params: P
 
   return (
     <div>
-      <Link href={`/app/discover${service ? `?service=${service}` : ""}`} className="text-sm font-bold text-slate hover:text-ink">
+      <Link href={`/app/discover${service ? `?service=${service}` : ""}`} className="clay-btn-ghost inline-flex rounded-full px-4 py-2 text-sm font-bold">
         Back to results
       </Link>
       <div className="mt-6 grid gap-8 lg:grid-cols-[1.3fr_1fr]">
@@ -52,8 +56,12 @@ export default async function ProviderPage({ params, searchParams }: { params: P
             Speaks {provider.languages.join(", ")}. Usually replies within {provider.responds_within_hours} hours.
           </p>
 
+          <div className="mt-8">
+            <AttendanceCard data={attendance} tz={profile!.timezone} name={provider.display_name} />
+          </div>
+
           <h2 className="mt-10 text-xl font-bold">Services and prices</h2>
-          <ul className="mt-3 divide-y divide-mist rounded-2xl border border-mist bg-card">
+          <ul className="clay mt-3 divide-y divide-mist/70 px-2">
             {list.map((o) => (
               <li key={o.services.id} className="flex items-center justify-between px-4 py-3">
                 <span>
@@ -69,7 +77,7 @@ export default async function ProviderPage({ params, searchParams }: { params: P
           <ul className="mt-3 space-y-3">
             {(reviews ?? []).map((r) => (
               <li key={r.id}>
-                <Card className="p-4">
+                <Card className="p-5">
                   <div className="flex items-center justify-between text-sm">
                     <span className="font-bold">{r.author_name}</span>
                     <Rating value={r.rating} />
@@ -89,6 +97,7 @@ export default async function ProviderPage({ params, searchParams }: { params: P
               offers={list.map((o) => ({ id: o.services.id, name: o.services.name, price: Number(o.price), cadence: o.services.default_cadence }))}
               initialService={selected.services.id}
               currency={profile!.currency}
+              clientName={profile!.full_name || "You"}
             />
           </aside>
         )}

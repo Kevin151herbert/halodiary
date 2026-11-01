@@ -71,11 +71,15 @@ export default async function ProviderView({ searchParams }: { searchParams: Pro
   const { data: payouts } = await supabase.from("ledger_entries").select("amount").eq("provider_id", providerId).eq("kind", "payout");
   const earned = (payouts ?? []).reduce((s, e) => s + Number(e.amount), 0);
   const upcoming = visits.filter((v) => ["scheduled", "awaiting", "confirmed"].includes(v.status));
+  const { data: unsigned } =
+    me.role === "provider"
+      ? await supabase.from("contracts").select("id, version, plans(services(name))").eq("provider_id", providerId).eq("status", "pending").is("provider_signed_at", null)
+      : { data: [] };
 
   return (
     <div className="space-y-8">
       {me.role === "client" && (
-        <p className="rounded-xl bg-halo-soft px-4 py-3 text-sm">
+        <p className="clay-inset px-4 py-3 text-sm">
           You&apos;re seeing your demo provider&apos;s side of HaloDiary. Demo providers have no login, so you can answer for them here and watch it reach your diary.
         </p>
       )}
@@ -95,7 +99,7 @@ export default async function ProviderView({ searchParams }: { searchParams: Pro
               <Link
                 key={c.id}
                 href={`/app/provider?p=${c.id}`}
-                className={`rounded-full border px-3 py-1.5 text-sm font-bold ${c.id === providerId ? "border-ink bg-ink text-white" : "border-mist bg-card"}`}
+                className={`rounded-full px-4 py-2 text-sm font-bold ${c.id === providerId ? "clay-btn-ink" : "clay-btn-ghost"}`}
               >
                 {c.name}
               </Link>
@@ -104,10 +108,25 @@ export default async function ProviderView({ searchParams }: { searchParams: Pro
         )}
       </div>
 
-      <ul className="space-y-3">
+      {!!unsigned?.length && (
+        <section className="clay p-5">
+          <h2 className="font-bold">Agreements to sign</h2>
+          <ul className="mt-2 space-y-1 text-sm">
+            {unsigned.map((c) => (
+              <li key={c.id}>
+                <Link href={`/app/agreements/${c.id}`} className="font-bold underline">
+                  {(c.plans as unknown as { services: { name: string } })?.services?.name}, version {c.version}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <ul className="space-y-4">
         {visits.map((v) => (
           <li key={v.id}>
-            <Card className="p-4">
+            <Card className="p-5">
               <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                 <span className="w-40 font-display font-bold">{fmt(v.scheduled_at)}</span>
                 <span className="flex-1">

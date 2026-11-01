@@ -31,27 +31,23 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
   return (
     <div className="max-w-2xl">
       <h1 className="text-3xl font-extrabold sm:text-4xl">Settings</h1>
-      {saved && <p className="mt-4 rounded-xl bg-sage-soft px-4 py-3 font-bold text-sage">Settings saved.</p>}
+      {saved && <p className="clay-sm mt-4 px-4 py-3 font-bold text-sage">Settings saved.</p>}
       <form action={saveSettingsAction} className="mt-8 space-y-8">
         <label className="block text-sm font-bold">
           Name
-          <input name="full_name" defaultValue={p.full_name} className="mt-1 w-full rounded-xl border border-mist bg-card px-4 py-3 font-normal" />
+          <input name="full_name" defaultValue={p.full_name} className="clay-inset mt-1.5 w-full px-4 py-3 font-normal" />
         </label>
 
         <fieldset>
           <legend className="text-xl font-bold">AI assistant</legend>
-          <div className="mt-4 divide-y divide-mist rounded-2xl border border-mist bg-card">
+          <div className="mt-4 clay divide-y divide-mist/70">
             {toggles.map((t) => (
-              <label key={t.name} className="flex cursor-pointer items-start gap-4 p-4">
-                <input type="checkbox" name={t.name} defaultChecked={t.on} className="peer sr-only" />
-                <span
-                  aria-hidden
-                  className="relative mt-0.5 h-6 w-11 shrink-0 rounded-full bg-mist transition peer-checked:bg-ink after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:transition peer-checked:after:translate-x-5 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-halo"
-                />
-                <span>
+              <label key={t.name} className="flex cursor-pointer items-start gap-4 p-5">
+                <span className="flex-1">
                   <span className="block font-bold">{t.title}</span>
                   <span className="block text-sm text-slate">{t.body}</span>
                 </span>
+                <input type="checkbox" name={t.name} defaultChecked={t.on} className="clay-switch mt-0.5" />
               </label>
             ))}
           </div>
@@ -69,7 +65,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
 
         <button className={btn.primary}>Save settings</button>
       </form>
-      <form action={signOutAction} className="mt-10 border-t border-mist pt-6">
+      <form action={signOutAction} className="mt-10">
         <button className={btn.ghost}>Log out</button>
       </form>
     </div>

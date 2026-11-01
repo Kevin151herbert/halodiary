@@ -7,6 +7,8 @@ import { tool } from "ai";
 import { z } from "zod";
 import * as core from "../actions-core";
 import { CADENCE_KEYS, cadenceLabel } from "../cadence";
+import { attendanceFor } from "../attendance";
+import { TERM_OPTIONS } from "../contract";
 import { forecastMonth, monthKey, nowFor, spentInMonth } from "../engine";
 import type { Profile } from "../supabase/server";
 import { fmtShort, monthLabel } from "../time";
@@ -103,6 +105,22 @@ export function buildTools(supabase: SupabaseClient, profile: Profile) {
       },
     }),
 
+    get_provider_attendance: tool({
+      description:
+        "A provider's attendance record: the share of booked visits they rendered, offered an alternative time for, or cancelled, with cancellation reasons. Use when the user asks how reliable a provider is.",
+      inputSchema: z.object({ provider_id: z.string() }),
+      execute: async ({ provider_id }) => {
+        const a = await attendanceFor(supabase, provider_id, nowFor(profile).toISOString());
+        return {
+          booked_visits: a.total,
+          rendered_pct: a.total ? Math.round((a.rendered / a.total) * 100) : null,
+          alternative_pct: a.total ? Math.round((a.alternative / a.total) * 100) : null,
+          cancelled_pct: a.total ? Math.round((a.cancelled / a.total) * 100) : null,
+          recent_cancellations: a.items.filter((i) => i.outcome === "cancelled").slice(0, 5).map((i) => ({ when: fmtShort(i.at, tz), reason: i.note })),
+        };
+      },
+    }),
+
     get_payments: tool({
       description: "Recent payment events: holds, charges, releases and provider payouts, with PayPal references.",
       inputSchema: z.object({ limit: z.number().min(1).max(50).optional() }),
@@ -153,7 +171,7 @@ export function buildTools(supabase: SupabaseClient, profile: Profile) {
 
     answer_visit: tool({
       description:
-        "Answer a visit as the client: proceed, skip (nothing charged), or reschedule to a new time. Needs the user's approval.",
+        "Answer a visit as the client: proceed, skip, or reschedule to a new time. Skipping or moving inside the agreement's free-change window can cost a late fee (see SERVICE AGREEMENTS in context and the visit's hours to start); if so, say the fee in the summary. Needs the user's approval.",
       inputSchema: z.object({
         visit_id: z.string(),
         summary: z.string().describe("Plain description for the approval card, e.g. 'Move Thursday cleaning to Friday 10:00'"),
@@ -172,6 +190,33 @@ export function buildTools(supabase: SupabaseClient, profile: Profile) {
         status: z.enum(["active", "paused", "ended"]),
       }),
       execute: async ({ plan_id, status }) => core.setPlanStatus(supabase, profile, plan_id, status, "assistant"),
+    }),
+
+    propose_agreement_change: tool({
+      description:
+        "Propose new terms for a service agreement. The client signs by approving; demo providers sign straight away, real providers must sign before it takes effect. Only include the terms that change. Needs the user's approval.",
+      inputSchema: z.object({
+        plan_id: z.string(),
+        summary: z.string().describe("For the approval card, e.g. 'Cleaning agreement: free changes up to 48h, late fee 25%'"),
+        cancellation_notice_hours: z.union(TERM_OPTIONS.cancellation_notice_hours.map((n) => z.literal(n)) as never).optional(),
+        late_cancellation_fee_pct: z.union(TERM_OPTIONS.late_cancellation_fee_pct.map((n) => z.literal(n)) as never).optional(),
+        free_reschedules_per_month: z.union(TERM_OPTIONS.free_reschedules_per_month.map((n) => z.literal(n)) as never).optional(),
+        termination_notice_days: z.union(TERM_OPTIONS.termination_notice_days.map((n) => z.literal(n)) as never).optional(),
+        reminder_hours: z.union(TERM_OPTIONS.reminder_hours.map((n) => z.literal(n)) as never).optional(),
+        price_lock_months: z.union(TERM_OPTIONS.price_lock_months.map((n) => z.literal(n)) as never).optional(),
+        note: z.string().optional(),
+      }),
+      execute: async ({ plan_id, note, ...rest }) => {
+        const { summary, ...terms } = rest;
+        void summary;
+        return core.proposeAmendment(supabase, profile, { planId: plan_id, terms, note }, "assistant");
+      },
+    }),
+
+    sign_agreement: tool({
+      description: "Sign a pending agreement version that is waiting for this user's signature (for example new terms a provider proposed). Needs the user's approval.",
+      inputSchema: z.object({ contract_id: z.string(), summary: z.string() }),
+      execute: async ({ contract_id }) => core.signAgreement(supabase, profile, contract_id, "assistant"),
     }),
 
     approve_budget: tool({
@@ -201,21 +246,25 @@ export function buildTools(supabase: SupabaseClient, profile: Profile) {
   const providerActions = {
     answer_as_provider: tool({
       description:
-        "Answer a visit as the provider: confirm it, propose a new time to the client, or mark it done so payment is released. Needs the user's approval.",
+        "Answer a visit as the provider: confirm it, propose a new time to the client, mark it done so payment is released, or cancel it with a reason the client will see (late changes credit the client under the agreement). Needs the user's approval.",
       inputSchema: z.object({
         visit_id: z.string(),
         summary: z.string(),
-        action: z.enum(["proceed", "propose", "complete"]),
+        action: z.enum(["proceed", "propose", "complete", "cancel"]),
         new_time: localTime.optional(),
+        reason: z.string().optional().describe("Required to cancel"),
       }),
-      execute: async ({ visit_id, action, new_time }) =>
-        core.providerRespond(supabase, profile, { visitId: visit_id, action, newTime: new_time }, "assistant"),
+      execute: async ({ visit_id, action, new_time, reason }) =>
+        core.providerRespond(supabase, profile, { visitId: visit_id, action, newTime: new_time, reason }, "assistant"),
     }),
   };
 
   if (profile.role === "provider") {
     // A provider's own visits are in the context snapshot; client data stays out of reach.
-    return { tools: { list_services: readTools.list_services, ...providerActions }, approval: ["answer_as_provider"] };
+    return {
+      tools: { list_services: readTools.list_services, ...providerActions, sign_agreement: clientActions.sign_agreement },
+      approval: ["answer_as_provider", "sign_agreement"],
+    };
   }
   return {
     tools: { ...readTools, ...clientActions, ...providerActions },

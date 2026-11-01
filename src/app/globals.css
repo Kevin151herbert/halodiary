@@ -3,7 +3,7 @@
 /*
   HaloDiary tokens
   ink    #1D2238  deep indigo, text and primary surfaces
-  paper  #F5F6FA  cool page background
+  paper  #ECEFF4  cool clay canvas
   halo   #F2B83A  the halo ring: upcoming visits, the one accent
   sage   #2E8A74  confirmed, paid, done
   rose   #C8506A  needs your answer
@@ -12,8 +12,10 @@
 */
 :root {
   --ink: #1d2238;
-  --paper: #f5f6fa;
+  --paper: #eceff4;
   --card: #ffffff;
+  --clay-hi: rgba(255, 255, 255, 0.95);
+  --clay-lo: rgba(29, 34, 56, 0.1);
   --halo: #f2b83a;
   --halo-soft: #fdf1d6;
   --sage: #2e8a74;
@@ -77,13 +79,17 @@ h3,
 /* The halo: a day ring whose arc shows how much of the day is booked. */
 .halo-ring {
   --fill: 0;
-  background: conic-gradient(var(--halo) calc(var(--fill) * 1turn), var(--mist) 0);
+  background: conic-gradient(from 0deg, #f9d77f, #eba721 calc(var(--fill) * 1turn), #dfe3ea 0);
   border-radius: 9999px;
-  padding: 3px;
+  padding: 4px;
+  box-shadow:
+    5px 6px 12px -4px rgba(29, 34, 56, 0.18),
+    -4px -4px 9px rgba(255, 255, 255, 0.9);
 }
 .halo-ring > * {
-  background: var(--card);
+  background: linear-gradient(150deg, #ffffff, #f2f4f8);
   border-radius: 9999px;
+  box-shadow: inset 2px 2px 4px rgba(29, 34, 56, 0.08);
 }
 
 @keyframes halo-in {
@@ -98,4 +104,205 @@ h3,
 }
 .halo-ring.animate {
   animation: halo-in 900ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+/* ---------- Claymorphism ----------
+   Puffy surfaces lit from the top left: a soft drop shadow down-right, a white glow up-left,
+   and inner highlights so each surface reads as a soft moulded object. */
+.clay {
+  background: linear-gradient(150deg, #ffffff 0%, #f6f8fb 100%);
+  border-radius: 28px;
+  box-shadow:
+    14px 16px 32px -6px var(--clay-lo),
+    -10px -10px 24px var(--clay-hi),
+    inset 2px 2px 2px rgba(255, 255, 255, 1),
+    inset -3px -4px 8px rgba(29, 34, 56, 0.045);
+}
+.clay-sm {
+  background: linear-gradient(150deg, #ffffff 0%, #f6f8fb 100%);
+  border-radius: 20px;
+  box-shadow:
+    8px 10px 20px -6px var(--clay-lo),
+    -6px -6px 14px var(--clay-hi),
+    inset 1px 1px 1px rgba(255, 255, 255, 1),
+    inset -2px -3px 6px rgba(29, 34, 56, 0.04);
+}
+a.clay,
+a.clay-sm,
+button.clay-sm {
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+a.clay:hover,
+a.clay-sm:hover,
+button.clay-sm:hover {
+  transform: translateY(-2px);
+}
+/* Pressed-in wells: inputs, tracks, segmented controls */
+.clay-inset {
+  background: #e6e9f0;
+  border-radius: 18px;
+  box-shadow:
+    inset 4px 4px 8px rgba(29, 34, 56, 0.09),
+    inset -4px -4px 8px rgba(255, 255, 255, 0.9);
+  border: 1px solid transparent;
+}
+input.clay-inset,
+select.clay-inset,
+textarea.clay-inset {
+  background: #eef1f6;
+  box-shadow:
+    inset 3px 3px 6px rgba(29, 34, 56, 0.08),
+    inset -3px -3px 6px rgba(255, 255, 255, 0.95);
+}
+input.clay-inset:focus,
+select.clay-inset:focus,
+textarea.clay-inset:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--halo) 70%, transparent);
+}
+/* Outlined icon tiles, as in the nav */
+.clay-tile {
+  border-radius: 22px;
+  border: 1.5px solid rgba(29, 34, 56, 0.16);
+  background: transparent;
+  box-shadow:
+    inset 2px 2px 4px rgba(255, 255, 255, 0.8),
+    inset -2px -2px 4px rgba(29, 34, 56, 0.04);
+  transition: all 160ms ease;
+}
+.clay-tile:hover {
+  border-color: rgba(29, 34, 56, 0.3);
+}
+.clay-tile[aria-current="page"] {
+  border-color: transparent;
+  background: linear-gradient(150deg, #ffffff, #f4f6fa);
+  box-shadow:
+    8px 10px 20px -6px var(--clay-lo),
+    -6px -6px 14px var(--clay-hi),
+    inset 1px 1px 1px #fff;
+}
+/* Gradient buttons with a soft coloured glow */
+.clay-btn-ink {
+  background: linear-gradient(135deg, #46508a 0%, #1d2238 100%);
+  color: #fff;
+  box-shadow:
+    0 12px 22px -8px rgba(29, 34, 56, 0.6),
+    inset 1px 2px 2px rgba(255, 255, 255, 0.25),
+    inset -2px -3px 5px rgba(0, 0, 0, 0.2);
+}
+.clay-btn-halo {
+  background: linear-gradient(135deg, #f9d77f 0%, #eba721 100%);
+  color: var(--ink);
+  box-shadow:
+    0 12px 22px -8px rgba(235, 167, 33, 0.7),
+    inset 1px 2px 2px rgba(255, 255, 255, 0.55),
+    inset -2px -3px 5px rgba(160, 100, 0, 0.18);
+}
+.clay-btn-ghost {
+  background: linear-gradient(150deg, #ffffff, #f2f4f8);
+  color: var(--ink);
+  box-shadow:
+    6px 8px 16px -6px rgba(29, 34, 56, 0.18),
+    -4px -4px 10px rgba(255, 255, 255, 0.9),
+    inset 1px 1px 1px #fff,
+    inset -1px -2px 4px rgba(29, 34, 56, 0.05);
+}
+.clay-btn-ink,
+.clay-btn-halo,
+.clay-btn-ghost {
+  transition: transform 140ms ease, filter 140ms ease, box-shadow 140ms ease;
+}
+.clay-btn-ink:hover,
+.clay-btn-halo:hover,
+.clay-btn-ghost:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.04);
+}
+.clay-btn-ink:active,
+.clay-btn-halo:active,
+.clay-btn-ghost:active {
+  transform: translateY(1px);
+  box-shadow: inset 3px 3px 6px rgba(0, 0, 0, 0.15);
+}
+/* Gradient fills for bars and gauges */
+.fill-halo {
+  background: linear-gradient(90deg, #f9d77f, #eba721);
+}
+.fill-ink {
+  background: linear-gradient(90deg, #6d77b0, #1d2238);
+}
+.knob {
+  background: radial-gradient(circle at 35% 30%, #fff 0 30%, #eef1f6 70%);
+  box-shadow:
+    3px 4px 8px rgba(29, 34, 56, 0.25),
+    inset -1px -2px 3px rgba(29, 34, 56, 0.1);
+  border-radius: 9999px;
+}
+/* A gradient icon chip, like the "+" tile */
+.clay-chip {
+  border-radius: 14px;
+  box-shadow:
+    0 8px 14px -6px rgba(29, 34, 56, 0.45),
+    inset 1px 2px 2px rgba(255, 255, 255, 0.3);
+}
+/* Switch */
+.clay-switch {
+  appearance: none;
+  -webkit-appearance: none;
+  position: relative;
+  width: 58px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  background: #e6e9f0;
+  box-shadow:
+    inset 3px 3px 6px rgba(29, 34, 56, 0.12),
+    inset -3px -3px 6px rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  transition: background 200ms ease;
+}
+.clay-switch::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 24px;
+  height: 24px;
+  border-radius: 9999px;
+  background: radial-gradient(circle at 35% 30%, #fff 0 35%, #eef1f6 75%);
+  box-shadow: 2px 3px 6px rgba(29, 34, 56, 0.25);
+  transition: transform 200ms cubic-bezier(0.3, 0.7, 0.3, 1);
+}
+.clay-switch:checked {
+  background: linear-gradient(135deg, #46508a, #1d2238);
+  box-shadow:
+    inset 2px 2px 5px rgba(0, 0, 0, 0.3),
+    0 8px 14px -6px rgba(29, 34, 56, 0.5);
+}
+.clay-switch:checked::after {
+  transform: translateX(26px);
+}
+/* Attendance dots: the tooltip sits above the whole dot strip (its positioned parent),
+   so it never runs off the edge of a phone screen. */
+.tip > .tip-body {
+  pointer-events: none;
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  z-index: 30;
+  width: max-content;
+  max-width: min(260px, 92%);
+  transform: translateX(-50%);
+  display: none;
+}
+.tip:hover > .tip-body,
+.tip:focus > .tip-body {
+  display: block;
+  animation: tip-in 140ms ease both;
+}
+@keyframes tip-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 4px);
+  }
 }

@@ -52,7 +52,7 @@ export function Onboarding({ role, name, services }: { role: "client" | "provide
         <span className="text-sm text-slate">or pick a city</span>
         <select
           aria-label="City"
-          className="rounded-full border border-mist bg-card px-4 py-2 text-sm font-bold"
+          className="clay-btn-ghost rounded-full px-4 py-2 text-sm font-bold"
           value={loc && loc.city !== "Your location" ? loc.city : ""}
           onChange={(e) => {
             const c = CITIES.find((x) => x.name === e.target.value);
@@ -83,14 +83,14 @@ export function Onboarding({ role, name, services }: { role: "client" | "provide
               value={headline}
               onChange={(e) => setHeadline(e.target.value)}
               placeholder="e.g. Detailed home cleaning, eco products"
-              className="mt-1 w-full rounded-xl border border-mist bg-card px-4 py-3 font-normal"
+              className="clay-inset mt-1.5 w-full px-4 py-3 font-normal"
             />
           </label>
           <ul className="mt-4 grid gap-2 sm:grid-cols-2">
             {services.map((s) => {
               const on = s.id in offers;
               return (
-                <li key={s.id} className={`flex items-center gap-3 rounded-xl border p-3 ${on ? "border-ink bg-card" : "border-mist bg-card/60"}`}>
+                <li key={s.id} className={`flex items-center gap-3 rounded-2xl p-3 ${on ? "clay-sm ring-2 ring-halo" : "clay-inset"}`}>
                   <input
                     type="checkbox"
                     id={`svc-${s.id}`}
@@ -115,7 +115,7 @@ export function Onboarding({ role, name, services }: { role: "client" | "provide
                       aria-label={`Price for ${s.name}`}
                       value={offers[s.id]}
                       onChange={(e) => setOffers((o) => ({ ...o, [s.id]: Number(e.target.value) }))}
-                      className="w-20 rounded-lg border border-mist px-2 py-1 text-right text-sm"
+                      className="clay-inset w-20 rounded-lg px-2 py-1 text-right text-sm"
                     />
                   ) : (
                     <span className="text-xs text-slate">from {money(Number(s.typical_price))}</span>

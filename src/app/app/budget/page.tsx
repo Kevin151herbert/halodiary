@@ -1,4 +1,4 @@
-import { Card, money } from "@/components/ui";
+import { Card, Meter, money } from "@/components/ui";
 import { forecastMonth, monthKey, nowFor, spentInMonth } from "@/lib/engine";
 import { paypalConfigured } from "@/lib/paypal";
 import { getSession } from "@/lib/supabase/server";
@@ -27,6 +27,8 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
 
   const cap = budget ? Number(budget.cap) : forecast.cap;
   const pct = cap ? Math.min(100, (used / cap) * 100) : 0;
+  const { data: openCredits } = await supabase.from("ledger_entries").select("amount").eq("client_id", p.id).eq("kind", "credit").is("settled_at", null);
+  const credit = (openCredits ?? []).reduce((s, c) => s + Number(c.amount), 0);
   const realPayPal = paypalConfigured();
 
   return (
@@ -38,19 +40,19 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
             Approve once with PayPal. Each visit is then held when it&apos;s confirmed and charged only after it&apos;s done, always inside this cap.
           </p>
         </div>
-        <nav className="flex gap-1 rounded-full border border-mist bg-card p-1 text-sm font-bold" aria-label="Month">
-          <a href="/app/budget" className={`rounded-full px-4 py-1.5 ${month === thisMonth ? "bg-ink text-white" : ""}`}>
+        <nav className="clay-inset flex gap-1 rounded-full p-1 text-sm font-bold" aria-label="Month">
+          <a href="/app/budget" className={`rounded-full px-4 py-1.5 ${month === thisMonth ? "clay-btn-ink" : ""}`}>
             This month
           </a>
-          <a href="/app/budget?m=next" className={`rounded-full px-4 py-1.5 ${month === nextMonth ? "bg-ink text-white" : ""}`}>
+          <a href="/app/budget?m=next" className={`rounded-full px-4 py-1.5 ${month === nextMonth ? "clay-btn-ink" : ""}`}>
             Next month
           </a>
         </nav>
       </div>
 
-      {approved && <p className="rounded-xl bg-sage-soft px-4 py-3 font-bold text-sage">Budget approved{approved === "paypal" ? " with PayPal" : ""}. Visits will now confirm on their own.</p>}
+      {approved && <p className="clay-sm px-4 py-3 font-bold text-sage">Budget approved{approved === "paypal" ? " with PayPal" : ""}. Visits will now confirm on their own.</p>}
       {paypal_error && (
-        <p className="rounded-xl bg-rose-soft px-4 py-3 text-sm text-rose">
+        <p className="clay-sm px-4 py-3 text-sm text-rose">
           {paypal_error === "cancelled"
             ? "PayPal approval was cancelled. Nothing was saved."
             : paypal_error === "not_configured"
@@ -113,19 +115,24 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
               <p className="text-sm font-bold text-sage">Approved {budget.approval_mode === "paypal_sandbox" ? "with PayPal sandbox" : "(simulated)"}</p>
               <p className="mt-2 font-display text-4xl font-extrabold">{money(cap, p.currency)}</p>
               <p className="text-sm text-slate">monthly cap</p>
-              <div className="mt-6 h-3 overflow-hidden rounded-full bg-mist" role="img" aria-label={`${pct.toFixed(0)}% used`}>
-                <div className="h-full rounded-full bg-halo" style={{ width: `${pct}%` }} />
+              <div className="mt-6">
+                <Meter value={pct / 100} label={`${pct.toFixed(0)}% of the cap used`} />
               </div>
-              <p className="mt-2 text-sm">
+              <p className="mt-3 text-sm">
                 {money(used, p.currency)} held or paid, {money(Math.max(0, cap - used), p.currency)} left
               </p>
+              {credit > 0 && (
+                <p className="clay-inset mt-4 px-3 py-2 text-sm">
+                  <span className="font-bold text-sage">{money(credit, p.currency)} credit</span> from provider changes, taken off your next payments.
+                </p>
+              )}
               {p.paypal_payer_email && <p className="mt-auto pt-6 text-xs text-slate">Paying with PayPal account {p.paypal_payer_email}</p>}
               {realPayPal && !p.paypal_payment_token && (
                 <form action="/api/paypal/start" method="post" className="mt-auto pt-6">
                   <input type="hidden" name="month" value={month} />
                   <input type="hidden" name="cap" value={cap} />
                   <p className="mb-2 text-xs text-slate">This month was approved without PayPal. Switch to real PayPal sandbox payments:</p>
-                  <button className="w-full rounded-full bg-[#ffc439] px-5 py-2.5 text-sm font-bold text-[#003087] hover:brightness-95">Switch to PayPal</button>
+                  <button className="w-full rounded-full bg-[#ffc439] px-5 py-3 text-sm font-bold text-[#003087] shadow-[0_12px_22px_-8px_rgba(255,170,0,0.7),inset_1px_2px_2px_rgba(255,255,255,0.6)] hover:brightness-95">Switch to PayPal</button>
                 </form>
               )}
             </>
@@ -139,7 +146,7 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
                   <form action="/api/paypal/start" method="post">
                     <input type="hidden" name="month" value={month} />
                     <input type="hidden" name="cap" value={forecast.cap} />
-                    <button disabled={!forecast.lines.length} className="w-full rounded-full bg-[#ffc439] px-5 py-3 font-bold text-[#003087] hover:brightness-95 disabled:opacity-50">
+                    <button disabled={!forecast.lines.length} className="w-full rounded-full bg-[#ffc439] px-5 py-3.5 font-bold text-[#003087] shadow-[0_12px_22px_-8px_rgba(255,170,0,0.7),inset_1px_2px_2px_rgba(255,255,255,0.6)] hover:brightness-95 disabled:opacity-50">
                       Approve with PayPal
                     </button>
                   </form>
@@ -159,9 +166,9 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
       <section>
         <h2 className="text-xl font-bold">Payments ledger</h2>
         <p className="mt-1 text-sm text-slate">Every hold, charge, release and provider payout, with its PayPal reference.</p>
-        <div className="mt-4 overflow-x-auto rounded-2xl border border-mist bg-card">
+        <div className="mt-4 overflow-x-auto clay">
           <table className="w-full min-w-[640px] text-sm">
-            <thead className="border-b border-mist text-left text-slate">
+            <thead className="text-left text-slate">
               <tr>
                 <th className="px-4 py-2.5 font-normal">When</th>
                 <th className="px-4 py-2.5 font-normal">What</th>
@@ -175,13 +182,17 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
                 <tr key={e.id}>
                   <td className="px-4 py-2.5 text-slate">{fmt(e.created_at, p.timezone, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</td>
                   <td className="px-4 py-2.5 font-bold">
-                    {{ hold: "Held", capture: "Charged", void: "Released", payout: "Paid provider", refund: "Refunded" }[e.kind as string]}
+                    {{ hold: "Held", capture: "Charged", void: "Released", payout: "Paid provider", refund: "Refunded", fee: "Late change fee", credit: "Agreement credit" }[e.kind as string]}
+                    {e.note && <span className="block text-xs font-normal text-slate">{e.note}</span>}
                   </td>
                   <td className="px-4 py-2.5">
                     {e.visits?.services?.name}
                     {e.kind === "payout" && <span className="text-slate"> to {e.providers?.display_name}</span>}
                   </td>
-                  <td className="px-4 py-2.5 text-right">{money(Number(e.amount), p.currency)}</td>
+                  <td className={`px-4 py-2.5 text-right ${e.kind === "credit" ? "text-sage" : ""}`}>
+                    {e.kind === "credit" ? "−" : ""}
+                    {money(Number(e.amount), p.currency)}
+                  </td>
                   <td className="px-4 py-2.5">
                     <code className="text-xs">{e.paypal_ref}</code>{" "}
                     <span className={`ml-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${e.mode === "paypal_sandbox" ? "bg-[#ffc439]/40" : "bg-mist text-slate"}`}>

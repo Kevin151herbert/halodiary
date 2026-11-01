@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Avatar, ButtonLink, Card, Halo, money, StatusPill } from "@/components/ui";
 import { cadenceLabel } from "@/lib/cadence";
-import { upcomingVisits } from "@/lib/actions-core";
+import { changeCost, upcomingVisits } from "@/lib/actions-core";
 import { forecastMonth, MINUTES_SAVED_PER_VISIT, monthKey, nowFor } from "@/lib/engine";
 import { getSession } from "@/lib/supabase/server";
 import { addDays, dayKey as dayKeyZ, fmt, fmtDay as fmtDayZ, fmtTime as fmtTimeZ, localInputValue, zonedTime, zParts } from "@/lib/time";
@@ -21,7 +21,7 @@ export default async function DiaryPage({ searchParams }: { searchParams: Promis
   const visits = await upcomingVisits(supabase, p, 14);
   const { data: plans } = await supabase
     .from("plans")
-    .select("*, services(name), providers(display_name, avatar_hue)")
+    .select("*, services(name), providers(id, display_name, avatar_hue)")
     .eq("client_id", p.id)
     .neq("status", "ended")
     .order("created_at");
@@ -52,6 +52,12 @@ export default async function DiaryPage({ searchParams }: { searchParams: Promis
   const forecast = await forecastMonth(supabase, p, monthKey(now, tz));
 
   const needsAnswer = visits.filter((v) => v.status === "awaiting" && !v.client_response);
+  // What skipping or moving each visit would cost right now under its agreement.
+  const costs = new Map(
+    await Promise.all(
+      needsAnswer.map(async (v) => [v.id, { skip: await changeCost(supabase, p, v, "skip"), move: await changeCost(supabase, p, v, "reschedule") }] as const),
+    ),
+  );
   const hours = Math.round(((handled ?? 0) * MINUTES_SAVED_PER_VISIT) / 6) / 10;
 
   // Fourteen days in the user's time zone, today first; the first seven get halos.
@@ -93,27 +99,27 @@ export default async function DiaryPage({ searchParams }: { searchParams: Promis
           </h1>
           {added && <p className="mt-2 font-bold text-sage">Added to your diary. The first visits are below.</p>}
         </div>
-        <div className="flex gap-6 text-right">
-          <div>
+        <div className="flex gap-4 text-right">
+          <div className="clay-sm px-5 py-3">
             <p className="font-display text-3xl font-extrabold">{hours}h</p>
             <p className="text-xs text-slate">time saved so far</p>
           </div>
-          <div>
+          <div className="clay-sm px-5 py-3">
             <p className="font-display text-3xl font-extrabold">{money(budget ? Number(budget.cap) : forecast.cap, currency)}</p>
             <p className="text-xs text-slate">{budget?.status === "approved" ? "budget approved" : "budget to approve"}</p>
           </div>
         </div>
       </section>
 
-      <section aria-label="Next seven days">
-        <ol className="grid grid-cols-7 gap-2 sm:gap-4">
+      <section aria-label="Next seven days" className="clay px-3 py-5 sm:px-6">
+        <ol className="grid grid-cols-7 gap-1 sm:gap-4">
           {days.map((d, i) => {
             const list = byDay.get(dayKey(d)) ?? [];
             const live = list.filter((v) => !["skipped", "cancelled"].includes(v.status));
             return (
               <li key={i} className="flex flex-col items-center gap-2">
                 <a href={live.length ? `#day-${i}` : undefined} className="rounded-full">
-                  <Halo fill={Math.min(1, live.length / 3)} size={52} animate label={`${fmt(d, tz, { weekday: "long" })}: ${live.length} visits`}>
+                  <Halo fill={Math.min(1, live.length / 3)} size={48} animate label={`${fmt(d, tz, { weekday: "long" })}: ${live.length} visits`}>
                     <span className="text-[10px] text-slate">{fmt(d, tz, { weekday: "short" })}</span>
                     <span className="font-display text-base font-bold">{fmt(d, tz, { day: "numeric" })}</span>
                   </Halo>
@@ -136,7 +142,7 @@ export default async function DiaryPage({ searchParams }: { searchParams: Promis
               const [text, iso] = String(n.body).split("|");
               return (
                 <li key={n.id}>
-                  <Card className="border-rose/30 p-5">
+                  <Card className="p-5 ring-2 ring-rose/20">
                     <p className="font-bold">{n.title}</p>
                     <p className="mt-1 text-sm text-slate">{text}</p>
                     <ProposalAnswer notificationId={n.id} visitId={n.visit_id} newTime={iso} />
@@ -162,7 +168,13 @@ export default async function DiaryPage({ searchParams }: { searchParams: Promis
                           {v.provider_response === "proceed" ? `${v.providers?.display_name.split(" ")[0]} has confirmed.` : "Waiting for the provider too."}{" "}
                           {money(Number(v.price), currency)} will be held when you confirm.
                         </p>
-                        <VisitAnswer visitId={v.id} suggested={localInputValue(new Date(at.getTime() + 86_400_000), tz)} />
+                        <VisitAnswer
+                          visitId={v.id}
+                          suggested={localInputValue(new Date(at.getTime() + 86_400_000), tz)}
+                          skipFee={costs.get(v.id)?.skip.fee ? money(costs.get(v.id)!.skip.fee, currency) : null}
+                          moveFee={costs.get(v.id)?.move.fee ? money(costs.get(v.id)!.move.fee, currency) : null}
+                          lateNote={costs.get(v.id)?.skip.late ? costs.get(v.id)!.move.reason || costs.get(v.id)!.skip.reason : null}
+                        />
                       </div>
                     </div>
                   </Card>
@@ -184,7 +196,7 @@ export default async function DiaryPage({ searchParams }: { searchParams: Promis
               return (
                 <div key={i} id={`day-${i}`}>
                   <h3 className="text-sm font-bold text-slate">{fmtDay(d)}</h3>
-                  <ul className="mt-2 divide-y divide-mist rounded-2xl border border-mist bg-card">
+                  <ul className="clay-sm mt-2 divide-y divide-mist/70 px-1">
                     {list.map((v) => {
                       const at = new Date(v.scheduled_at);
                       return (
@@ -192,11 +204,23 @@ export default async function DiaryPage({ searchParams }: { searchParams: Promis
                           <span className="w-12 font-display font-bold">{fmtTime(at)}</span>
                           <span className="min-w-0 flex-1">
                             <span className="font-bold">{v.services?.name}</span>
-                            <span className="text-slate"> with {v.providers?.display_name}</span>
+                            <span className="text-slate"> with </span>
+                            <Link href={`/app/providers/${v.provider_id}`} className="text-slate underline decoration-mist decoration-2 underline-offset-2 hover:text-ink">
+                              {v.providers?.display_name}
+                            </Link>
                             {v.rescheduled_from && <span className="text-sm text-slate"> (moved)</span>}
                           </span>
                           <span className="text-sm">{money(Number(v.price), currency)}</span>
-                          <StatusPill status={v.status} />
+                          {v.provider_response === "cancel" ? (
+                            <span className="tip inline-flex rounded-full bg-rose-soft px-2.5 py-1 text-xs font-bold text-rose" tabIndex={0}>
+                              Cancelled by provider
+                              <span className="tip-body clay-sm px-3 py-2 text-xs font-normal text-ink" role="tooltip">
+                                {v.cancel_reason || "No reason given"}
+                              </span>
+                            </span>
+                          ) : (
+                            <StatusPill status={v.status} />
+                          )}
                         </li>
                       );
                     })}
@@ -217,20 +241,31 @@ export default async function DiaryPage({ searchParams }: { searchParams: Promis
             return (
               <li key={pl.id}>
                 <Card className="flex h-full flex-col p-4">
-                  <div className="flex items-center gap-3">
-                    <Avatar name={pl.providers?.display_name ?? ""} hue={pl.providers?.avatar_hue ?? 200} size={36} />
+                  <Link href={`/app/providers/${pl.provider_id}?service=${pl.service_id}`} className="group flex items-center gap-3">
+                    <Avatar name={pl.providers?.display_name ?? ""} hue={pl.providers?.avatar_hue ?? 200} size={40} />
                     <div className="min-w-0 flex-1">
                       <p className="font-bold">{pl.services?.name}</p>
                       <p className="text-sm text-slate">
-                        {pl.providers?.display_name}, {cadenceLabel(pl.cadence, pl.weekdays).toLowerCase()} at {String(pl.time_of_day).slice(0, 5)}
+                        <span className="font-bold text-ink underline decoration-mist decoration-2 underline-offset-2 group-hover:decoration-halo">
+                          {pl.providers?.display_name}
+                        </span>
+                        , {cadenceLabel(pl.cadence, pl.weekdays).toLowerCase()} at {String(pl.time_of_day).slice(0, 5)}
                       </p>
                     </div>
-                  </div>
+                  </Link>
                   <div className="mt-3 flex items-center justify-between text-sm">
                     <span className="text-slate">
                       {pl.status === "paused" ? "Paused" : `${line?.visits ?? 0} visits this month, ${money(line?.total ?? 0, currency)}`}
                     </span>
                     <PlanControls planId={pl.id} status={pl.status} />
+                  </div>
+                  <div className="mt-2 flex gap-3 text-xs font-bold text-slate">
+                    <Link href={`/app/providers/${pl.provider_id}?service=${pl.service_id}`} className="hover:text-ink">
+                      Attendance
+                    </Link>
+                    <Link href="/app/agreements" className="hover:text-ink">
+                      Agreement
+                    </Link>
                   </div>
                 </Card>
               </li>
@@ -247,10 +282,10 @@ export default async function DiaryPage({ searchParams }: { searchParams: Promis
           <h2 id="recent" className="text-xl font-bold">
             Latest updates
           </h2>
-          <ul className="mt-3 space-y-2 text-sm">
+          <ul className="clay mt-3 space-y-3 p-5 text-sm">
             {recent.map((n) => (
               <li key={n.id} className="flex gap-3">
-                <span className={`mt-1.5 h-2 w-2 shrink-0 rounded-full ${n.read_at ? "bg-mist" : "bg-halo"}`} aria-hidden />
+                <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${n.read_at ? "bg-[#d5dae3]" : "fill-halo"}`} aria-hidden />
                 <span>
                   <span className="font-bold">{n.title}</span>
                   {n.body && <span className="text-slate"> {n.body}</span>}

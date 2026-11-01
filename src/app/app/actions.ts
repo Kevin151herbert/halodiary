@@ -16,8 +16,15 @@ function done(path = "/app") {
   revalidatePath(path, "layout");
 }
 
+function termsFrom(form: FormData) {
+  const t: Record<string, number> = {};
+  for (const [k, v] of form.entries()) if (k.startsWith("t_")) t[k.slice(2)] = Number(v);
+  return t;
+}
+
 export async function addPlanAction(form: FormData) {
   const { supabase, profile } = await session();
+  if (form.get("agree") !== "on") return { error: "Please agree to the service agreement first." };
   const weekdays = form.getAll("weekdays").map(Number);
   const res = await core.createPlan(
     supabase,
@@ -28,6 +35,7 @@ export async function addPlanAction(form: FormData) {
       cadence: String(form.get("cadence")),
       weekdays,
       time: String(form.get("time") || "10:00"),
+      terms: termsFrom(form),
     },
     "user",
   );
@@ -36,16 +44,42 @@ export async function addPlanAction(form: FormData) {
   redirect("/app?added=1");
 }
 
-export async function respondAction(visitId: string, action: "proceed" | "skip" | "reschedule", newTime?: string) {
+export async function respondAction(visitId: string, action: "proceed" | "skip" | "reschedule", newTime?: string, acceptsProposal = false) {
   const { supabase, profile } = await session();
-  const res = await core.clientRespond(supabase, profile, { visitId, action, newTime }, "user");
+  const res = await core.clientRespond(supabase, profile, { visitId, action, newTime, acceptsProposal }, "user");
   done();
   return res;
 }
 
-export async function providerAction(visitId: string, action: "proceed" | "propose" | "complete", newTime?: string) {
+export async function providerAction(visitId: string, action: "proceed" | "propose" | "complete" | "cancel", newTime?: string, reason?: string) {
   const { supabase, profile } = await session();
-  const res = await core.providerRespond(supabase, profile, { visitId, action, newTime }, "user");
+  const res = await core.providerRespond(supabase, profile, { visitId, action, newTime, reason }, "user");
+  done();
+  return res;
+}
+
+export async function signAgreementAction(contractId: string) {
+  const { supabase, profile } = await session();
+  const res = await core.signAgreement(supabase, profile, contractId, "user");
+  done();
+  return res;
+}
+
+export async function declineAgreementAction(contractId: string) {
+  const { supabase, profile } = await session();
+  const res = await core.declineAgreement(supabase, profile, contractId, "user");
+  done();
+  return res;
+}
+
+export async function proposeAmendmentAction(form: FormData) {
+  const { supabase, profile } = await session();
+  const res = await core.proposeAmendment(
+    supabase,
+    profile,
+    { planId: String(form.get("plan_id")), terms: termsFrom(form), note: String(form.get("note") ?? "") },
+    "user",
+  );
   done();
   return res;
 }

@@ -14,6 +14,7 @@ const PAGE_NAMES: Record<string, string> = {
   "/app/budget": "Budget (monthly cap, PayPal approval and payments ledger)",
   "/app/provider": "Provider view (answering visits as a provider)",
   "/app/activity": "Activity log",
+  "/app/agreements": "Agreements (the signed terms for each service)",
   "/app/settings": "Settings (assistant switches)",
 };
 
@@ -48,11 +49,25 @@ export async function buildContext(supabase: SupabaseClient, profile: Profile, p
         `- plan ${p.id}: ${p.services?.name} with ${p.providers?.display_name} (provider ${p.provider_id}), ${cadenceLabel(p.cadence, p.weekdays)} at ${String(p.time_of_day).slice(0, 5)}, ${profile.currency} ${Number(p.price).toFixed(2)} a visit, status ${p.status}`,
       );
 
+    const { data: contracts } = await supabase
+      .from("contracts")
+      .select("id, plan_id, version, status, terms, client_signed_at, provider_signed_at")
+      .eq("client_id", profile.id)
+      .in("status", ["active", "pending"]);
+    lines.push("", "SERVICE AGREEMENTS (terms both parties signed; HaloDiary enforces them automatically):");
+    if (!contracts?.length) lines.push("- none");
+    for (const c of contracts ?? []) {
+      const t = c.terms as Record<string, number>;
+      lines.push(
+        `- agreement ${c.id} for plan ${c.plan_id}, v${c.version} ${c.status}${c.status === "pending" ? ` (waiting for ${c.provider_signed_at ? "client" : "provider"} signature)` : ""}: free changes up to ${t.cancellation_notice_hours}h before, late fee ${t.late_cancellation_fee_pct}% (first ${t.free_reschedules_per_month} late moves a month free), provider gives ${t.provider_change_notice_hours}h notice or credits ${t.provider_late_change_credit_pct}% (late cancel ${t.provider_cancellation_credit_pct}%), reminder ${t.reminder_hours}h before, ${t.termination_notice_days} days' notice to end, price fixed ${t.price_lock_months} months`,
+      );
+    }
+
     lines.push("", "NEXT 10 DAYS OF VISITS:");
     if (!visits.length) lines.push("- none");
     for (const v of visits.slice(0, 25))
       lines.push(
-        `- visit ${v.id}: ${fmtShort(v.scheduled_at, tz)}, ${v.services?.name} with ${v.providers?.display_name}, ${profile.currency} ${Number(v.price).toFixed(2)}, status ${v.status}${v.status === "awaiting" && !v.client_response ? " (WAITING FOR THE CLIENT'S ANSWER)" : ""}`,
+        `- visit ${v.id}: ${fmtShort(v.scheduled_at, tz)}, ${v.services?.name} with ${v.providers?.display_name}, ${profile.currency} ${Number(v.price).toFixed(2)}, status ${v.status}${v.status === "awaiting" && !v.client_response ? " (WAITING FOR THE CLIENT'S ANSWER)" : ""}${v.provider_response === "cancel" ? ` (provider cancelled: ${v.cancel_reason})` : ""}, starts in ${Math.round((new Date(v.scheduled_at).getTime() - now.getTime()) / 3_600_000)}h`,
       );
 
     lines.push(

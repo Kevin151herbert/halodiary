@@ -39,6 +39,8 @@ const APPROVE_LABEL: Record<string, string> = {
   approve_budget: "Approve budget",
   update_assistant_settings: "Update",
   answer_as_provider: "Confirm",
+  propose_agreement_change: "Sign and propose",
+  sign_agreement: "Sign",
 };
 
 function approvalText(name: string, input: Record<string, unknown> = {}) {
@@ -89,7 +91,7 @@ function ProviderResults({ output }: { output: unknown }) {
     <ul className="mt-1 space-y-1.5">
       {(output as { provider_id: string; name: string; price: string; rating: number; distance_km: number }[]).map((r) => (
         <li key={r.provider_id}>
-          <a href={`/app/providers/${r.provider_id}`} className="flex items-center justify-between rounded-xl border border-mist bg-paper px-3 py-2 text-sm hover:border-ink/30">
+          <a href={`/app/providers/${r.provider_id}`} className="clay-btn-ghost flex items-center justify-between rounded-xl px-3 py-2 text-sm">
             <span className="font-bold">{r.name}</span>
             <span className="text-slate">
               ★ {r.rating.toFixed(1)}, {r.distance_km.toFixed(1)} km, {r.price}
@@ -105,7 +107,7 @@ function ToolView({ part, onApprove }: { part: ToolPart; onApprove: (id: string,
   const name = part.type.replace(/^tool-/, "");
   if (part.state === "approval-requested" && part.approval && !part.approval.isAutomatic) {
     return (
-      <div className="rounded-2xl border-2 border-halo bg-halo-soft/60 p-4">
+      <div className="clay-sm p-4 ring-2 ring-halo/70">
         <p className="text-xs font-bold text-slate">Needs your OK</p>
         <p className="mt-1 font-bold">{approvalText(name, part.input)}</p>
         <div className="mt-3 flex gap-2">
@@ -188,7 +190,7 @@ function Chat({ role, firstName, onDisable }: { role: string; firstName: string;
             <ul className="mt-4 space-y-2">
               {(SUGGESTIONS[role] ?? SUGGESTIONS.client).map((s) => (
                 <li key={s}>
-                  <button onClick={() => send(s)} className="w-full rounded-xl border border-mist bg-paper px-3 py-2 text-left text-sm hover:border-ink/30">
+                  <button onClick={() => send(s)} className="clay-btn-ghost w-full rounded-xl px-3 py-2 text-left text-sm">
                     {s}
                   </button>
                 </li>
@@ -198,7 +200,7 @@ function Chat({ role, firstName, onDisable }: { role: string; firstName: string;
         )}
         {messages.map((m) => (
           <div key={m.id} className={m.role === "user" ? "flex justify-end" : ""}>
-            <div className={m.role === "user" ? "max-w-[85%] rounded-2xl rounded-br-md bg-ink px-4 py-2.5 text-white" : "space-y-2"}>
+            <div className={m.role === "user" ? "clay-btn-ink max-w-[85%] rounded-3xl rounded-br-lg px-4 py-2.5" : "space-y-2"}>
               {m.parts.map((part, i) => {
                 if (part.type === "text") return <Text key={i} text={part.text} />;
                 if (part.type.startsWith("tool-"))
@@ -229,9 +231,9 @@ function Chat({ role, firstName, onDisable }: { role: string; firstName: string;
           e.preventDefault();
           send(input);
         }}
-        className="border-t border-mist p-3"
+        className="p-3"
       >
-        <div className="flex items-end gap-2 rounded-2xl border border-mist bg-paper p-2 focus-within:border-ink">
+        <div className="flex items-end gap-2 clay-inset p-2">
           <label htmlFor="assistant-input" className="sr-only">
             Message the assistant
           </label>
@@ -249,7 +251,7 @@ function Chat({ role, firstName, onDisable }: { role: string; firstName: string;
             placeholder={role === "client" ? "Book, move, skip or ask about spending…" : "Ask about your visits…"}
             className="max-h-32 min-h-[2.5rem] flex-1 resize-none bg-transparent px-2 py-2 text-sm outline-none"
           />
-          <button type="submit" disabled={busy || !input.trim()} className="rounded-xl bg-ink p-2.5 text-white disabled:opacity-40" aria-label="Send">
+          <button type="submit" disabled={busy || !input.trim()} className="clay-btn-ink rounded-2xl p-2.5 disabled:opacity-40" aria-label="Send">
             <Send size={16} />
           </button>
         </div>
@@ -301,8 +303,8 @@ export function AssistantShell({
         <button
           onClick={() => setOpen(true)}
           aria-label={enabled ? "Ask HaloDiary" : "Assistant off"}
-          className={`fixed bottom-20 right-4 z-30 inline-flex items-center gap-2 rounded-full p-3.5 text-sm font-bold shadow-lg md:bottom-6 md:right-6 md:px-5 md:py-3 ${
-            enabled ? "bg-ink text-white" : "border border-mist bg-card text-slate"
+          className={`fixed bottom-24 right-4 z-30 inline-flex items-center gap-2 rounded-full p-3.5 text-sm font-bold md:bottom-6 md:right-6 md:px-5 md:py-3 ${
+            enabled ? "clay-btn-ink" : "clay-btn-ghost text-slate"
           }`}
         >
           <Sparkles size={18} className={enabled ? "text-halo" : ""} aria-hidden />
@@ -313,9 +315,9 @@ export function AssistantShell({
       {open && (
         <aside
           aria-label="Assistant"
-          className="fixed inset-0 z-40 flex flex-col bg-card sm:inset-y-0 sm:left-auto sm:right-0 sm:w-[420px] sm:border-l sm:border-mist"
+          className="fixed inset-0 z-40 flex flex-col bg-paper sm:inset-y-3 sm:left-auto sm:right-3 sm:w-[420px] sm:rounded-[28px] sm:shadow-[18px_20px_50px_-10px_rgba(29,34,56,0.35)]"
         >
-          <header className="flex items-center gap-3 border-b border-mist px-5 py-3">
+          <header className="flex items-center gap-3 px-5 py-4">
             <Sparkles size={18} className="text-halo" aria-hidden />
             <h2 className="flex-1 font-display text-lg font-bold">Assistant</h2>
             <button
@@ -324,9 +326,9 @@ export function AssistantShell({
               aria-label="Assistant on or off"
               disabled={pending}
               onClick={() => toggle(!enabled)}
-              className={`relative h-6 w-11 rounded-full transition ${enabled ? "bg-ink" : "bg-mist"}`}
+              className={`relative h-7 w-12 rounded-full transition ${enabled ? "clay-btn-ink" : "clay-inset"}`}
             >
-              <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${enabled ? "left-[22px]" : "left-0.5"}`} />
+              <span className={`knob absolute top-1 h-5 w-5 transition-all ${enabled ? "left-[24px]" : "left-1"}`} />
             </button>
             <button onClick={() => setOpen(false)} className="rounded-full p-1.5 hover:bg-mist/60" aria-label="Close assistant">
               <X size={18} />
