@@ -1,12 +1,16 @@
 "use client";
 
-import { Check, CreditCard, Plus, Send, Sparkles, Star } from "lucide-react";
+import { AlertTriangle, Check, CreditCard, Plus, RotateCcw, Send, Sparkles, Star } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { btn, field } from "@/components/ui";
 import type { Message } from "@/lib/chat";
 import { createClient } from "@/lib/supabase/client";
 import { fmt } from "@/lib/time";
 import {
+  acceptRefundAction,
+  demoProblemAction,
+  offerRefundAction,
+  reportProblemAction,
   demoReplyAction,
   markChatReadAction,
   payRequestAction,
@@ -26,15 +30,25 @@ type Props = {
   tz: string;
   visits: { id: string; label: string }[];
   paysWithPayPal: boolean;
+  reportable?: { id: string; label: string; price: number }[];
 };
+
+const REASONS: [string, string][] = [
+  ["no_show", "Provider didn't show up"],
+  ["incomplete", "Job not finished"],
+  ["quality", "Poor quality"],
+  ["damage", "Something was damaged"],
+  ["late", "Very late"],
+  ["other", "Something else"],
+];
 
 const PAYPAL_BTN =
   "inline-flex items-center justify-center gap-2 rounded-full bg-[#ffc439] px-5 py-3 text-sm font-bold text-[#003087] shadow-[0_12px_22px_-8px_rgba(255,170,0,0.7),inset_1px_2px_2px_rgba(255,255,255,0.6)] transition hover:brightness-95 disabled:opacity-50";
 
-export function Chat({ conversationId, initial, as, otherName, isDemo, currency, tz, visits, paysWithPayPal }: Props) {
+export function Chat({ conversationId, initial, as, otherName, isDemo, currency, tz, visits, paysWithPayPal, reportable = [] }: Props) {
   const [messages, setMessages] = useState<Message[]>(initial);
   const [text, setText] = useState("");
-  const [panel, setPanel] = useState<null | "extra" | "pay" | "request">(null);
+  const [panel, setPanel] = useState<null | "extra" | "pay" | "request" | "problem" | "refund">(null);
   const [typing, setTyping] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -151,6 +165,45 @@ export function Chat({ conversationId, initial, as, otherName, isDemo, currency,
             onClose={() => setPanel(null)}
           />
         )}
+        {panel === "problem" && (
+          <ProblemPanel
+            visits={reportable}
+            pending={pending}
+            onSend={(visitId, reason, details) =>
+              start(async () => {
+                const r = await reportProblemAction(conversationId, visitId, reason, details);
+                if (fail(r)) return;
+                if (r && "message" in r && r.message) merge([r.message]);
+                setPanel(null);
+                if (r && "demo" in r && r.demo && "problemId" in r && r.problemId) {
+                  setTyping(true);
+                  try {
+                    const d = await demoProblemAction(r.problemId);
+                    if (d && "messages" in d && d.messages) merge(d.messages);
+                  } finally {
+                    setTyping(false);
+                  }
+                }
+              })
+            }
+            onClose={() => setPanel(null)}
+          />
+        )}
+        {panel === "refund" && (
+          <RefundPanel
+            currency={currency}
+            pending={pending}
+            onSend={(amount, note) =>
+              start(async () => {
+                const r = await offerRefundAction(conversationId, amount, note);
+                if (fail(r)) return;
+                if (r && "message" in r && r.message) merge([r.message]);
+                setPanel(null);
+              })
+            }
+            onClose={() => setPanel(null)}
+          />
+        )}
         {panel === "request" && (
           <RequestPanel
             currency={currency}
@@ -176,11 +229,23 @@ export function Chat({ conversationId, initial, as, otherName, isDemo, currency,
               <button type="button" onClick={() => setPanel(panel === "pay" ? null : "pay")} className={`${btn.ghost} px-3.5 py-2 text-xs`}>
                 <CreditCard size={14} aria-hidden /> Pay {first}
               </button>
+              {reportable.length > 0 && (
+                <button type="button" onClick={() => setPanel(panel === "problem" ? null : "problem")} className={`${btn.ghost} px-3.5 py-2 text-xs text-rose`}>
+                  <AlertTriangle size={14} aria-hidden /> Report a problem
+                </button>
+              )}
             </>
           ) : (
-            <button type="button" onClick={() => setPanel(panel === "request" ? null : "request")} className={`${btn.ghost} px-3.5 py-2 text-xs`}>
-              <CreditCard size={14} aria-hidden /> Request payment
-            </button>
+            <>
+              <button type="button" onClick={() => setPanel(panel === "request" ? null : "request")} className={`${btn.ghost} px-3.5 py-2 text-xs`}>
+                <CreditCard size={14} aria-hidden /> Request payment
+              </button>
+              {messages.some((m) => m.kind === "problem" && m.status === "open") && (
+                <button type="button" onClick={() => setPanel(panel === "refund" ? null : "refund")} className={`${btn.ghost} px-3.5 py-2 text-xs`}>
+                  <RotateCcw size={14} aria-hidden /> Offer a refund
+                </button>
+              )}
+            </>
           )}
         </div>
         <form
@@ -257,6 +322,58 @@ function Bubble({
             {typeof m.meta?.paypal_ref === "string" && <code className="ml-1 text-[11px] text-slate">{m.meta.paypal_ref}</code>}
           </span>
         </span>
+      </li>
+    );
+  }
+
+  if (m.kind === "problem") {
+    const reason = REASONS.find(([k]) => k === (m.meta as { reason?: string })?.reason)?.[1] ?? "PayPal dispute";
+    return (
+      <li className={`flex ${m.sender === "system" ? "justify-center" : mine ? "justify-end" : ""}`}>
+        <div className="clay w-full max-w-md p-5 ring-2 ring-rose/25">
+          <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-rose">
+            <AlertTriangle size={14} aria-hidden /> Problem reported · {reason}
+          </p>
+          <p className="mt-2 text-sm leading-relaxed">{m.body}</p>
+          <p className="mt-2 text-[11px] text-slate">
+            {time} · {m.status === "open" ? "Waiting for a response" : "Resolved"}
+            {m.sender === "client" ? " · summarised by AI from the client's words" : ""}
+          </p>
+        </div>
+      </li>
+    );
+  }
+
+  if (m.kind === "refund_offer") {
+    return (
+      <li className={`flex ${mine ? "justify-end" : ""}`}>
+        <div className="clay w-full max-w-sm p-5">
+          <p className="text-xs font-bold uppercase tracking-wide text-slate">Refund offered</p>
+          <p className="mt-1 font-bold">{m.body}</p>
+          <p className="mt-2 font-display text-3xl font-extrabold text-sage">{money(Number(m.amount))}</p>
+          {m.status === "paid" || m.status === "done" ? (
+            <p className="mt-3 inline-flex items-center gap-1.5 text-sm font-bold text-sage">
+              <Check size={16} aria-hidden /> Refunded
+            </p>
+          ) : as === "client" ? (
+            <button
+              className={`${PAYPAL_BTN} mt-4 w-full`}
+              disabled={pending}
+              onClick={() =>
+                start(async () => {
+                  const r = await acceptRefundAction(m.id);
+                  if (r && "error" in r && r.error) onError(r.error);
+                  else onMerge([{ ...m, status: "paid" }]);
+                })
+              }
+            >
+              {pending ? "Refunding…" : `Accept refund to ${paysWithPayPal ? "PayPal" : "PayPal (simulated)"}`}
+            </button>
+          ) : (
+            <p className="mt-3 text-sm text-slate">Waiting for your client to accept.</p>
+          )}
+          <p className="mt-2 text-[11px] text-slate">{time}</p>
+        </div>
       </li>
     );
   }
@@ -507,6 +624,82 @@ function RequestPanel({ currency, pending, onSend, onClose }: { currency: string
       <div className="flex gap-2">
         <button className={btn.primary} disabled={pending || !body.trim() || !(n > 0)} onClick={() => onSend(body, n)}>
           Send request
+        </button>
+        <button className={btn.quiet} onClick={onClose}>
+          Close
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ProblemPanel({
+  visits,
+  pending,
+  onSend,
+  onClose,
+}: {
+  visits: { id: string; label: string }[];
+  pending: boolean;
+  onSend: (visitId: string, reason: string, details: string) => void;
+  onClose: () => void;
+}) {
+  const [visit, setVisit] = useState(visits[0]?.id ?? "");
+  const [reason, setReason] = useState("quality");
+  const [details, setDetails] = useState("");
+  return (
+    <div className="clay-inset mb-3 space-y-3 p-4">
+      <p className="text-sm font-bold">Report a problem with a visit</p>
+      <p className="text-xs text-slate">Inside your agreement&apos;s window. The AI summarises it fairly for your provider; refunds go straight back to PayPal.</p>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <select aria-label="Which visit" value={visit} onChange={(e) => setVisit(e.target.value)} className={`${field} bg-white`}>
+          {visits.map((v) => (
+            <option key={v.id} value={v.id}>
+              {v.label}
+            </option>
+          ))}
+        </select>
+        <select aria-label="What went wrong" value={reason} onChange={(e) => setReason(e.target.value)} className={`${field} bg-white`}>
+          {REASONS.map(([k, label]) => (
+            <option key={k} value={k}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </div>
+      <textarea value={details} onChange={(e) => setDetails(e.target.value)} rows={2} maxLength={1200} placeholder="What happened?" className={`${field} resize-none bg-white`} />
+      <div className="flex gap-2">
+        <button className={btn.primary} disabled={pending || !visit} onClick={() => onSend(visit, reason, details)}>
+          {pending ? "Sending…" : "Send report"}
+        </button>
+        <button className={btn.quiet} onClick={onClose}>
+          Close
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function RefundPanel({ currency, pending, onSend, onClose }: { currency: string; pending: boolean; onSend: (amount: number, note: string) => void; onClose: () => void }) {
+  const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
+  const n = Number(amount);
+  return (
+    <div className="clay-inset mb-3 space-y-3 p-4">
+      <p className="text-sm font-bold">Offer a refund</p>
+      <div className="flex gap-2">
+        <label className="w-28 text-xs font-bold text-slate">
+          Amount ({currency})
+          <input type="number" min={1} step="0.5" value={amount} onChange={(e) => setAmount(e.target.value)} className={`${field} mt-1 bg-white text-ink`} />
+        </label>
+        <label className="flex-1 text-xs font-bold text-slate">
+          Note
+          <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={140} placeholder="Sorry, I'll finish the kitchen next time" className={`${field} mt-1 bg-white text-ink`} />
+        </label>
+      </div>
+      <div className="flex gap-2">
+        <button className={btn.primary} disabled={pending || !(n > 0)} onClick={() => onSend(n, note)}>
+          Send offer
         </button>
         <button className={btn.quiet} onClick={onClose}>
           Close

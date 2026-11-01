@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Avatar } from "@/components/ui";
 import { getConversation, listMessages } from "@/lib/chat";
+import { reportableVisits } from "@/lib/problems";
 import { nowFor } from "@/lib/engine";
 import { getSession } from "@/lib/supabase/server";
 import { fmtShort } from "@/lib/time";
@@ -30,6 +31,7 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
       ? await supabase.from("contracts").select("id").eq("client_id", p.id).eq("provider_id", conv.provider_id).eq("status", "active").limit(1).maybeSingle()
       : { data: null };
 
+  const reportable = as === "client" ? await reportableVisits(supabase, p, conv.provider_id) : [];
   const name = as === "client" ? (conv.providers?.display_name ?? "Provider") : "Your client";
   const next = visits?.[0];
 
@@ -71,6 +73,7 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
           tz={p.timezone}
           visits={(visits ?? []).map((v) => ({ id: v.id, label: `${(v.services as unknown as { name: string })?.name}, ${fmtShort(v.scheduled_at, p.timezone)}` }))}
           paysWithPayPal={Boolean(p.paypal_payment_token)}
+          reportable={reportable}
         />
       </div>
     </div>

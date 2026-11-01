@@ -11,6 +11,8 @@
   "dependencies": {
     "@ai-sdk/anthropic": "^4.0.94",
     "@ai-sdk/react": "^4.0.163",
+    "@paypal/agent-toolkit": "^1.11.0",
+    "@paypal/paypal-server-sdk": "^2.5.0",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.118.0",
     "ai": "^7.0.159",
@@ -19,6 +21,7 @@
     "next": "15.5.28",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "server-only": "^0.0.1",
     "zod": "^4.6.7"
   },
   "devDependencies": {

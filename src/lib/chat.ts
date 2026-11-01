@@ -15,7 +15,7 @@ export type Message = {
   id: string;
   conversation_id: string;
   sender: "client" | "provider" | "system";
-  kind: "text" | "extra_request" | "payment_request" | "payment" | "rating_request" | "rating";
+  kind: "text" | "extra_request" | "payment_request" | "payment" | "rating_request" | "rating" | "problem" | "refund_offer";
   body: string;
   amount: number | null;
   status: "open" | "accepted" | "declined" | "paid" | "cancelled" | "done" | null;

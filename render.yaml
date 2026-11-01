@@ -1,0 +1,14 @@
+# Render blueprint: a cron job that runs HaloDiary's scheduler every 10 minutes.
+# Connect this repo in Render (New > Blueprint) and set CRON_SECRET to the same value as on Vercel.
+services:
+  - type: cron
+    name: halodiary-scheduler
+    runtime: node
+    schedule: "*/10 * * * *"
+    buildCommand: "echo no build needed"
+    startCommand: "node scripts/run-scheduler.mjs"
+    envVars:
+      - key: APP_URL
+        value: https://halodiary.vercel.app
+      - key: CRON_SECRET
+        sync: false

@@ -9,6 +9,7 @@ import * as core from "../actions-core";
 import { CADENCE_KEYS, cadenceLabel } from "../cadence";
 import { attendanceFor } from "../attendance";
 import * as chat from "../chat";
+import { sendMonthlyStatement } from "../paypal-agent";
 import { TERM_OPTIONS } from "../contract";
 import { forecastMonth, monthKey, nowFor, spentInMonth } from "../engine";
 import type { Profile } from "../supabase/server";
@@ -235,6 +236,20 @@ export function buildTools(supabase: SupabaseClient, profile: Profile) {
           provider_reply: reply && "reply" in reply ? reply.reply?.body : "The provider will reply in the chat.",
           quote: reply && "request" in reply && reply.request ? { for: reply.request.body, amount: Number(reply.request.amount) } : null,
         };
+      },
+    }),
+
+    send_paypal_statement: tool({
+      description:
+        "Email the user an official PayPal statement for a month: a PayPal invoice listing every visit, fee, extra and refund HaloDiary charged, already marked paid (nothing more to pay). Uses the PayPal Agent Toolkit. Needs the user's approval.",
+      inputSchema: z.object({ month: z.enum(["this", "last"]), summary: z.string() }),
+      execute: async ({ month }) => {
+        try {
+          const key = monthKey(nowFor(profile), tz, month === "last" ? -1 : 0);
+          return await sendMonthlyStatement(supabase, profile, key);
+        } catch (e) {
+          return { error: e instanceof Error ? e.message : "PayPal couldn't create the statement" };
+        }
       },
     }),
 

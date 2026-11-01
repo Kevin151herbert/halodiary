@@ -4,6 +4,7 @@ import { paypalConfigured } from "@/lib/paypal";
 import { getSession } from "@/lib/supabase/server";
 import { fmt, monthLabel } from "@/lib/time";
 import { SimulatedApprove } from "./simulated-approve";
+import { StatementButton } from "./statement-button";
 
 export default async function BudgetPage({ searchParams }: { searchParams: Promise<{ m?: string; approved?: string; paypal_error?: string; welcome?: string }> }) {
   const { m, approved, paypal_error, welcome } = await searchParams;
@@ -178,7 +179,10 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
 
       <section>
         <h2 className="text-xl font-bold">Payments ledger</h2>
-        <p className="mt-1 text-sm text-slate">Every hold, charge, release and provider payout, with its PayPal reference.</p>
+        <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
+          <p className="text-sm text-slate">Every hold, charge, release, refund and payout, with its PayPal reference. A tick means PayPal confirmed it by webhook.</p>
+          {realPayPal && p.paypal_payer_email && <StatementButton month={month} label={label} />}
+        </div>
         <div className="mt-4 overflow-x-auto clay">
           <table className="w-full min-w-[640px] text-sm">
             <thead className="text-left text-slate">
@@ -211,6 +215,11 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
                     <span className={`ml-1 rounded-full px-2 py-0.5 text-[11px] font-bold ${e.mode === "paypal_sandbox" ? "bg-[#ffc439]/40" : "bg-mist text-slate"}`}>
                       {e.mode === "paypal_sandbox" ? "Sandbox" : "Simulated"}
                     </span>
+                    {e.paypal_confirmed_at && (
+                      <span className="ml-1 rounded-full bg-sage-soft px-2 py-0.5 text-[11px] font-bold text-sage" title={`PayPal webhook: ${e.paypal_status ?? "confirmed"}`}>
+                        ✓ PayPal
+                      </span>
+                    )}
                   </td>
                 </tr>
               ))}

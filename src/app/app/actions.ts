@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import * as core from "@/lib/actions-core";
 import * as chat from "@/lib/chat";
+import * as problems from "@/lib/problems";
+import { sendMonthlyStatement } from "@/lib/paypal-agent";
 import { log } from "@/lib/engine";
 import { getSession } from "@/lib/supabase/server";
 
@@ -215,4 +217,46 @@ export async function markChatReadAction(conversationId: string) {
   const { supabase, profile } = await session();
   await chat.markRead(supabase, conversationId, profile.role === "provider" ? "provider" : "client");
   done();
+}
+
+// ---------- Problems and refunds ----------
+
+export async function reportProblemAction(conversationId: string, visitId: string, reason: string, details: string) {
+  const { supabase, profile } = await session();
+  const res = await problems.reportProblem(supabase, profile, { conversationId, visitId, reason: reason as problems.Reason, details });
+  chatDone(conversationId);
+  return res;
+}
+
+export async function demoProblemAction(problemId: string) {
+  const { supabase, profile } = await session();
+  const res = await problems.demoRespondToProblem(supabase, profile, problemId);
+  chatDone();
+  return res;
+}
+
+export async function offerRefundAction(conversationId: string, amount: number, note: string) {
+  const { supabase, profile } = await session();
+  if (profile.role !== "provider") return { error: "Only providers offer refunds." };
+  const res = await problems.offerRefund(supabase, conversationId, amount, note);
+  chatDone(conversationId);
+  return res;
+}
+
+export async function acceptRefundAction(messageId: string) {
+  const { supabase, profile } = await session();
+  const res = await problems.acceptRefund(supabase, profile, messageId);
+  done();
+  return res;
+}
+
+export async function sendStatementAction(month: string) {
+  const { supabase, profile } = await session();
+  try {
+    const res = await sendMonthlyStatement(supabase, profile, month);
+    done();
+    return res;
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "PayPal couldn't create the statement." };
+  }
 }

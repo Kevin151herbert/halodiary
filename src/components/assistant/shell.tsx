@@ -42,6 +42,7 @@ const APPROVE_LABEL: Record<string, string> = {
   propose_agreement_change: "Sign and propose",
   sign_agreement: "Sign",
   message_provider: "Send",
+  send_paypal_statement: "Send statement",
 };
 
 function approvalText(name: string, input: Record<string, unknown> = {}) {
