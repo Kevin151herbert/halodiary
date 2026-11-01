@@ -29,7 +29,9 @@ export async function POST(req: Request) {
       failed.push(`${p.id.slice(0, 8)}: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
-  return Response.json({ clients: ids.length, advanced: ok, failed, ms: Date.now() - started });
+  const result = { clients: ids.length, advanced: ok, failed, ms: Date.now() - started, via: req.headers.get("user-agent")?.slice(0, 60) ?? "" };
+  await supabase.from("job_runs").insert({ job: "scheduler", result });
+  return Response.json(result);
 }
 
 export const GET = POST;
