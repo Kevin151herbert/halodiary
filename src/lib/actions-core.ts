@@ -191,7 +191,7 @@ export async function setPlanStatus(supabase: SupabaseClient, profile: Profile, 
   return { ok: true, kept };
 }
 
-async function getVisit(supabase: SupabaseClient, visitId: string) {
+export async function getVisit(supabase: SupabaseClient, visitId: string) {
   const { data } = await supabase.from("visits").select(VISIT_SELECT).eq("id", visitId).single();
   return data as VisitRow | null;
 }

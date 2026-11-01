@@ -122,6 +122,11 @@ export async function saveSettingsAction(form: FormData) {
     assistant_enabled: form.get("assistant_enabled") === "on",
     proactive_enabled: form.get("proactive_enabled") === "on",
     auto_checks_enabled: form.get("auto_checks_enabled") === "on",
+    agent_max_per_payment: (() => {
+      const v = String(form.get("agent_max_per_payment") ?? "").trim();
+      const n = Number(v);
+      return v && !Number.isNaN(n) && n >= 0 ? Math.round(n * 100) / 100 : null;
+    })(),
   };
   await supabase.from("profiles").update(patch).eq("id", profile.id);
   await log(supabase, profile.id, "user", "Updated settings", patch);
@@ -299,4 +304,24 @@ export async function invoiceRequestAction(messageId: string) {
   } catch (e) {
     return { error: e instanceof Error ? e.message : "PayPal couldn't create the invoice." };
   }
+}
+
+export async function createAgentTokenAction(label: string) {
+  const { supabase, profile } = await session();
+  const { newToken } = await import("@/lib/agent-tokens");
+  const t = newToken();
+  const name = label.trim().slice(0, 60) || "AI assistant";
+  const { error } = await supabase.from("agent_tokens").insert({ user_id: profile.id, label: name, token_hash: t.hash, token_hint: t.hint });
+  if (error) return { error: "Could not create the token." };
+  await log(supabase, profile.id, "user", `Connected an outside AI: ${name}`);
+  done();
+  return { ok: true, token: t.token };
+}
+
+export async function revokeAgentTokenAction(id: string) {
+  const { supabase, profile } = await session();
+  const { data } = await supabase.from("agent_tokens").update({ revoked_at: new Date().toISOString() }).eq("id", id).select("label").maybeSingle();
+  if (data) await log(supabase, profile.id, "user", `Disconnected ${data.label}`);
+  done();
+  return { ok: true };
 }

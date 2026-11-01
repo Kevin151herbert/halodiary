@@ -49,4 +49,5 @@ export type Profile = {
   interests?: string[];
   monthly_budget?: number | null;
   onboarded_at?: string | null;
+  agent_max_per_payment?: number | string | null;
 };

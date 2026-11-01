@@ -14,13 +14,14 @@ import { TERM_OPTIONS } from "../contract";
 import { forecastMonth, monthKey, nowFor, spentInMonth } from "../engine";
 import type { Profile } from "../supabase/server";
 import { fmtShort, monthLabel } from "../time";
+import { guardPayment, type AgentOrigin } from "../agent-guard";
 
 const cadenceEnum = z.enum(CADENCE_KEYS as [string, ...string[]]);
 const localTime = z
   .string()
   .describe("Wall-clock time in the user's time zone, formatted YYYY-MM-DDTHH:mm, e.g. 2026-11-05T16:30. No time zone suffix.");
 
-export function buildTools(supabase: SupabaseClient, profile: Profile) {
+export function buildTools(supabase: SupabaseClient, profile: Profile, origin: AgentOrigin = { via: "assistant" }) {
   const cur = profile.currency;
   const tz = profile.timezone;
 
@@ -298,6 +299,22 @@ export function buildTools(supabase: SupabaseClient, profile: Profile) {
         core.providerRespond(supabase, profile, { visitId: visit_id, action, newTime: new_time, reason }, "assistant"),
     }),
   };
+
+  // Every action that changes the diary or money is priced against the user's AI spending limit first.
+  const guarded = <T extends Record<string, unknown>>(set: T): T => {
+    for (const [name, t] of Object.entries(set)) {
+      const orig = (t as { execute: (i: Record<string, unknown>, o: unknown) => Promise<unknown> }).execute;
+      (t as { execute: unknown }).execute = async (input: Record<string, unknown>, opts: unknown) => {
+        const reason = String(input.reason ?? input.summary ?? "");
+        const blocked = await guardPayment(supabase, profile, origin, name, input, reason);
+        if (blocked) return blocked;
+        return orig(input, opts);
+      };
+    }
+    return set;
+  };
+  guarded(clientActions);
+  guarded(providerActions);
 
   if (profile.role === "provider") {
     // A provider's own visits are in the context snapshot; client data stays out of reach.

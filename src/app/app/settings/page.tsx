@@ -1,11 +1,21 @@
 import { btn } from "@/components/ui";
 import { getSession } from "@/lib/supabase/server";
+import { headers } from "next/headers";
+import { DEFAULT_AGENT_LIMIT } from "@/lib/agent-guard";
 import { saveSettingsAction, signOutAction } from "../actions";
+import { AgentConnections } from "./agents";
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
   const { saved } = await searchParams;
-  const { profile } = await getSession();
+  const { supabase, profile } = await getSession();
   const p = profile!;
+  const { data: tokens } = await supabase
+    .from("agent_tokens")
+    .select("id, label, token_hint, created_at, last_used_at")
+    .is("revoked_at", null)
+    .order("created_at", { ascending: false });
+  const h = await headers();
+  const mcpUrl = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}/api/mcp`;
 
   const toggles = [
     {
@@ -53,6 +63,30 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
           </div>
         </fieldset>
 
+        <fieldset>
+          <legend className="text-xl font-bold">AI spending limit</legend>
+          <label className="clay mt-4 block p-5">
+            <span className="block font-bold">Most an AI may approve in one payment</span>
+            <span className="block text-sm text-slate">
+              Applies to the assistant here and to any outside assistant you connect. Anything higher is refused, logged and sent to you to do yourself. Empty means no
+              limit here and {p.currency} {DEFAULT_AGENT_LIMIT} for outside assistants.
+            </span>
+            <span className="mt-3 flex items-center gap-2">
+              <span className="font-bold">{p.currency}</span>
+              <input
+                name="agent_max_per_payment"
+                type="number"
+                min="0"
+                step="1"
+                inputMode="decimal"
+                defaultValue={p.agent_max_per_payment == null ? "" : Number(p.agent_max_per_payment)}
+                placeholder="No limit"
+                className="clay-inset w-36 px-4 py-2.5"
+              />
+            </span>
+          </label>
+        </fieldset>
+
         <section className="text-sm text-slate">
           <p>
             Location: <span className="font-bold text-ink">{p.city ?? "set"}</span>.{" "}
@@ -65,6 +99,12 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
 
         <button className={btn.primary}>Save settings</button>
       </form>
+      <section className="mt-10" aria-labelledby="agents">
+        <h2 id="agents" className="text-xl font-bold">
+          Outside AI assistants
+        </h2>
+        <AgentConnections tokens={tokens ?? []} mcpUrl={mcpUrl} />
+      </section>
       <form action={signOutAction} className="mt-10">
         <button className={btn.ghost}>Log out</button>
       </form>
