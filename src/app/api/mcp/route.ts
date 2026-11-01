@@ -112,7 +112,7 @@ export async function POST(req: Request) {
         const isError = Boolean(result && typeof result === "object" && "error" in result && (result as { error: unknown }).error);
         if (acting.has(name) && !isError)
           await log(supabase, profile.id, "assistant", `${label} (external AI) used ${name.replace(/_/g, " ")}: ${input.reason}`, { via: "mcp", agent: label, tool: name, input });
-        return ok(m.id, { isError, content: [{ type: "text", text: JSON.stringify(result) }], structuredContent: result && typeof result === "object" ? result : { value: result } });
+        return ok(m.id, { isError, content: [{ type: "text", text: JSON.stringify(result) }], structuredContent: Array.isArray(result) ? { items: result } : result && typeof result === "object" ? result : { value: result } });
       }
       default:
         if (m.id === undefined) return null; // notifications need no answer
