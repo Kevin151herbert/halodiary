@@ -5,6 +5,16 @@ import { useState } from "react";
 import { btn } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 
+const FIRST = ["Ana", "Marco", "Lucía", "Sam", "Priya", "Tom", "Elena", "Jonas", "Amara", "Leo", "Nadia", "Kai"];
+const LAST = "BCDFGHJKLMNPRSTVW";
+
+/** A friendly name for a one-click demo account, so screens read like a real household, not a test. */
+function demoName() {
+  const first = FIRST[Math.floor(Math.random() * FIRST.length)];
+  const initial = LAST.charAt(Math.floor(Math.random() * LAST.length));
+  return `${first} ${initial}.`;
+}
+
 /** Creates a throwaway account in one click, so judges can explore without filling a form. */
 export function DemoLoginButton({ role = "client", label, variant = "halo", className = "" }: { role?: "client" | "provider"; label?: string; variant?: keyof typeof btn; className?: string }) {
   const router = useRouter();
@@ -19,7 +29,7 @@ export function DemoLoginButton({ role = "client", label, variant = "halo", clas
     const { data, error } = await supabase.auth.signUp({
       email: `judge-${role === "provider" ? "pro-" : ""}${id}@halodiary.app`,
       password: crypto.randomUUID(),
-      options: { data: { full_name: role === "provider" ? `Guest Pro ${id.toUpperCase()}` : `Guest ${id.toUpperCase()}`, role } },
+      options: { data: { full_name: demoName(), role } },
     });
     if (error || !data.session) {
       setBusy(false);
