@@ -755,7 +755,7 @@ function ProfileSheet({ m, money, chosen, onClose, onPick }: { m: Match; money: 
               <div>
                 <dt className="text-xs font-bold uppercase tracking-wide text-slate">Experience</dt>
                 <dd>
-                  {p.years_experience} years · {(p.languages as string[]).join(", ")}
+                  {p.years_experience} {p.years_experience === 1 ? "year" : "years"} · {(p.languages as string[]).join(", ")}
                 </dd>
               </div>
               <div>
@@ -852,7 +852,7 @@ function MatchCard({ m, rank, money, compact = false, children }: { m: Match; ra
           d.insured ? "Insured" : null,
           d.certifications || null,
           d.verified ? "ID checked" : null,
-          `${d.years_experience} yrs experience`,
+          `${d.years_experience} ${d.years_experience === 1 ? "yr" : "yrs"} experience`,
           Object.keys(d.socials ?? {}).length ? `On ${Object.keys(d.socials).join(" and ")}` : null,
         ]
           .filter(Boolean)

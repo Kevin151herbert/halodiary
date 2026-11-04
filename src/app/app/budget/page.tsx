@@ -150,7 +150,7 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
                 <td className="pt-1" colSpan={3}>
                   Suggested cap, with a 10% buffer
                 </td>
-                <td className="pt-1 text-right">{money(forecast.cap, p.currency)}</td>
+                <td className="pt-1 text-right">{money(raw.cap, p.currency)}</td>
               </tr>
             </tfoot>
           </table>
@@ -168,6 +168,13 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
               <p className="mt-3 text-sm">
                 {money(used, p.currency)} held or paid, {money(Math.max(0, cap - used), p.currency)} left
               </p>
+              {forecast.total > cap && (
+                <p className="mt-4 rounded-2xl bg-rose-soft px-3 py-2.5 text-sm" role="alert">
+                  <span className="font-bold text-rose">Over your cap. </span>
+                  Your services now forecast {money(forecast.total, p.currency)} for {label}, {money(forecast.total - cap, p.currency)} more than you approved. Visits
+                  past the cap wait for you instead of being charged. Raise the cap for next month, or pause a service on the Diary.
+                </p>
+              )}
               {credit > 0 && (
                 <p className="clay-inset mt-4 px-3 py-2 text-sm">
                   <span className="font-bold text-sage">{money(credit, p.currency)} credit</span> from provider changes, taken off your next payments.
@@ -188,7 +195,7 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
               <p className="text-sm text-slate">Approve once for {label}</p>
               <p className="mt-2 font-display text-4xl font-extrabold">{money(forecast.cap, p.currency)}</p>
               <p className="text-sm text-slate">
-                cap, charged per visit{p.monthly_budget && Number(p.monthly_budget) >= raw.total ? " (the budget you set)" : ""}
+                cap, charged per visit{p.monthly_budget && Number(p.monthly_budget) >= raw.total ? " (your monthly budget)" : ""}
               </p>
               <div className="mt-6 space-y-3">
                 {realPayPal && (

@@ -2,7 +2,7 @@
 // anything above the user's per-payment limit is refused, logged and reported to the user.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { changeCost, getVisit } from "./actions-core";
-import { CADENCES, type CadenceKey } from "./cadence";
+import { defaultWeekdays, visitsPerMonth } from "./cadence";
 import { forecastMonth, log, monthKey, nowFor } from "./engine";
 import { monthLabel } from "./time";
 import type { Profile } from "./supabase/server";
@@ -58,14 +58,14 @@ export async function blockReason(supabase: SupabaseClient, profile: Profile, or
       agent: `Refused by the user's spending limit: ${money(amount, cur)} is over the ${money(limit, cur)} per payment an AI may approve. Ask the user to do this in HaloDiary, or to raise the limit in Settings.`,
     };
   if (tool === "add_recurring_service" && amount > 0) {
-    const cadence = CADENCES[String(input.cadence) as CadenceKey];
     const month = monthKey(nowFor(profile), profile.timezone);
     const [{ data: budget }, forecast] = await Promise.all([
       supabase.from("budgets").select("cap, status").eq("client_id", profile.id).eq("month", month).maybeSingle(),
       forecastMonth(supabase, profile, month),
     ]);
     const cap = budget?.status === "approved" ? Number(budget.cap) : profile.monthly_budget ? Number(profile.monthly_budget) : null;
-    const added = amount * (cadence?.perMonth ?? 4.3);
+    const weekdays = Array.isArray(input.weekdays) ? (input.weekdays as number[]) : defaultWeekdays(String(input.cadence));
+    const added = amount * visitsPerMonth(String(input.cadence), weekdays);
     if (cap != null && forecast.total + added > cap)
       return {
         amount: added,

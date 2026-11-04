@@ -34,7 +34,7 @@ export async function ProviderDashboard({ providerId }: { providerId: string }) 
         .order("scheduled_at"),
       supabase
         .from("contracts")
-        .select("id, client_id, version, created_at, terms, plans(cadence, weekdays, time_of_day, price, services(name))")
+        .select("id, client_id, plan_id, version, created_at, terms, plans(cadence, weekdays, time_of_day, price, services(name))")
         .eq("provider_id", providerId)
         .eq("status", "pending")
         .is("provider_signed_at", null)
@@ -51,7 +51,9 @@ export async function ProviderDashboard({ providerId }: { providerId: string }) 
       supabase.from("plans").select("id", { count: "exact", head: true }).eq("provider_id", providerId),
     ]);
   const nameOf = new Map(((names ?? []) as { client_id: string; name: string }[]).map((n) => [n.client_id, n.name]));
-  const all = (visitsRaw ?? []) as VisitRow[];
+  // Visits of a client still waiting for your signature are not on your schedule yet.
+  const pendingPlans = new Set((pending ?? []).map((c) => (c as { plan_id: string }).plan_id));
+  const all = ((visitsRaw ?? []) as VisitRow[]).filter((v) => !v.plan_id || !pendingPlans.has(v.plan_id));
   const visits = all.filter((v) => new Date(v.scheduled_at).getTime() >= now.getTime() - 6 * 3_600_000 && new Date(v.scheduled_at).getTime() <= now.getTime() + 14 * 86_400_000);
   const earned = (payouts ?? []).filter((e) => e.kind === "payout").reduce((s, e) => s + Number(e.amount), 0);
   const weekEnd = now.getTime() + 7 * 86_400_000;

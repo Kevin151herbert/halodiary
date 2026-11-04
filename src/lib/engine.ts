@@ -69,12 +69,19 @@ export async function log(
   actor: "user" | "assistant" | "system",
   action: string,
   detail: Record<string, unknown> = {},
+  at?: string,
 ) {
-  await supabase.from("activity_log").insert({ user_id: userId, actor, action, detail });
+  await supabase.from("activity_log").insert({ user_id: userId, actor, action, detail, ...(at ? { created_at: at } : {}) });
 }
 
-export async function notify(supabase: SupabaseClient, userId: string, kind: string, title: string, body: string, visitId?: string) {
-  await supabase.from("notifications").insert({ user_id: userId, kind, title, body, visit_id: visitId ?? null });
+export async function notify(supabase: SupabaseClient, userId: string, kind: string, title: string, body: string, visitId?: string, at?: string) {
+  await supabase.from("notifications").insert({ user_id: userId, kind, title, body, visit_id: visitId ?? null, ...(at ? { created_at: at } : {}) });
+}
+
+/** When a visit ended, in the account's timeline (never later than its "now"), so its charge and payout are dated then. */
+function doneAt(profile: Profile, v: VisitRow) {
+  const end = new Date(v.scheduled_at).getTime() + ((v as { duration_minutes?: number }).duration_minutes ?? 60) * 60_000 + 15 * 60_000;
+  return new Date(Math.min(end, nowFor(profile).getTime())).toISOString();
 }
 
 /** Notify once per visit and kind, so repeated page loads don't stack the same message. */
@@ -106,7 +113,7 @@ async function backfillAgreements(supabase: SupabaseClient, profile: Profile, pl
   if (!plans.length) return;
   const { data: existing } = await supabase.from("contracts").select("plan_id").in("plan_id", plans.map((p) => p.id));
   const have = new Set((existing ?? []).map((c) => c.plan_id));
-  const at = new Date().toISOString();
+  const at = nowFor(profile).toISOString();
   const rows = plans
     .filter((p) => !have.has(p.id))
     .map((p) => {
@@ -297,6 +304,8 @@ async function holdPayment(supabase: SupabaseClient, profile: Profile, v: VisitR
     amount: v.price,
     paypal_ref: authId,
     mode,
+    // Held when confirmed, or at the 2-hour cut-off when nobody answered and the time skip went past it.
+    created_at: new Date(Math.min(nowFor(profile).getTime(), new Date(v.scheduled_at).getTime() - 2 * 3_600_000)).toISOString(),
   });
   await log(supabase, profile.id, "system", `Held ${fmtMoney(Number(v.price), profile.currency)} for ${v.services?.name}`, {
     visit: v.id,
@@ -324,7 +333,7 @@ export async function completeVisit(supabase: SupabaseClient, profile: Profile, 
       if (po.error) await log(supabase, profile.id, "system", "PayPal payout failed, recorded as simulated", { visit: v.id, error: po.error });
     }
     await supabase.from("visits").update({ status: "completed" }).eq("id", v.id);
-    await supabase.from("ledger_entries").insert({ client_id: profile.id, visit_id: v.id, provider_id: v.provider_id, kind: "payout", amount: share, paypal_ref: payoutId, mode: payoutMode, note: "Covered by monthly PayPal subscription" });
+    await supabase.from("ledger_entries").insert({ client_id: profile.id, visit_id: v.id, provider_id: v.provider_id, kind: "payout", amount: share, paypal_ref: payoutId, mode: payoutMode, note: "Covered by monthly PayPal subscription", created_at: doneAt(profile, v) });
     await log(supabase, profile.id, actor, `Completed ${v.services?.name}; paid ${v.providers?.display_name} from the subscription`, { visit: v.id });
     if (nowFor(profile).getTime() - new Date(v.scheduled_at).getTime() < 3 * 86_400_000) {
       const { requestRating } = await import("./chat");
@@ -378,9 +387,10 @@ export async function completeVisit(supabase: SupabaseClient, profile: Profile, 
 
   await supabase.from("visits").update({ status: "completed" }).eq("id", v.id);
   const note = creditUsed ? `${fmtMoney(creditUsed, cur)} agreement credit applied` : "";
+  const at = doneAt(profile, v);
   await supabase.from("ledger_entries").insert([
-    { client_id: profile.id, visit_id: v.id, provider_id: v.provider_id, kind: "capture", amount: charge, paypal_ref: captureId, mode, note },
-    { client_id: profile.id, visit_id: v.id, provider_id: v.provider_id, kind: "payout", amount: providerShare, paypal_ref: payoutId, mode: payoutMode, note },
+    { client_id: profile.id, visit_id: v.id, provider_id: v.provider_id, kind: "capture", amount: charge, paypal_ref: captureId, mode, note, created_at: at },
+    { client_id: profile.id, visit_id: v.id, provider_id: v.provider_id, kind: "payout", amount: providerShare, paypal_ref: payoutId, mode: payoutMode, note, created_at: at },
   ]);
   if (settled.length) await supabase.from("ledger_entries").update({ settled_at: new Date().toISOString() }).in("id", settled);
   await notify(
@@ -390,12 +400,16 @@ export async function completeVisit(supabase: SupabaseClient, profile: Profile, 
     `${v.services?.name} done, ${fmtMoney(charge, cur)} paid`,
     `${v.providers?.display_name} received ${fmtMoney(providerShare, cur)} through PayPal.${creditUsed ? ` Your ${fmtMoney(creditUsed, cur)} credit was taken off.` : ""}`,
     v.id,
+    at,
   );
-  await log(supabase, profile.id, actor, `Completed ${v.services?.name}; captured and paid ${v.providers?.display_name}`, {
-    visit: v.id,
-    mode,
-    credit: creditUsed,
-  });
+  await log(
+    supabase,
+    profile.id,
+    actor,
+    `Completed ${v.services?.name}; captured and paid ${v.providers?.display_name}`,
+    { visit: v.id, mode, credit: creditUsed },
+    at,
+  );
   // Ask for a rating in the chat with this provider. Only for visits that just finished,
   // so a long demo-clock jump doesn't flood the thread with old requests.
   if (nowFor(profile).getTime() - new Date(v.scheduled_at).getTime() < 3 * 86_400_000) {

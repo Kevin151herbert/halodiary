@@ -7,7 +7,7 @@ import { btn } from "@/components/ui";
 import { dismissTourAction } from "../start/actions";
 import { setClockAction } from "./actions";
 
-export type TourState = { approved: boolean; paypal: boolean; held: boolean; charged: boolean; asked: boolean; blocked: boolean; month: string };
+export type TourState = { approved: boolean; paypal: boolean; held: boolean; charged: boolean; asked: boolean; blocked: boolean; checkWaiting: boolean; month: string };
 
 const BUYER_EMAIL = process.env.NEXT_PUBLIC_SANDBOX_BUYER_EMAIL;
 const BUYER_PASSWORD = process.env.NEXT_PUBLIC_SANDBOX_BUYER_PASSWORD;
@@ -68,16 +68,24 @@ export function TourGuide({ state }: { state: TourState }) {
     {
       done: state.held,
       title: "Skip to tomorrow and confirm the visit",
-      body: "The day-before check for the first cleaning arrives. Press Proceed on the Diary and PayPal holds the price.",
-      action: (
-        <span className="flex flex-wrap gap-2">
-          <button className={`${btn.primary} px-4 py-2 text-sm`} disabled={pending} onClick={() => start(() => setClockAction(24))}>
-            {pending ? "Moving time…" : "Skip to tomorrow"}
-          </button>
-          <Link href="/app#answers" className={`${btn.ghost} px-4 py-2 text-sm`}>
-            Show the check
-          </Link>
-        </span>
+      body: state.checkWaiting
+        ? "The day-before check has arrived. Press Proceed on it and PayPal holds the price."
+        : "Skip a day: the day-before check for the first cleaning arrives. Then press Proceed and PayPal holds the price.",
+      action: state.checkWaiting ? (
+        <button
+          className={`${btn.primary} px-4 py-2 text-sm`}
+          onClick={() => {
+            const el = document.getElementById("answers");
+            if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
+            else window.location.href = "/app#answers";
+          }}
+        >
+          Show me the check
+        </button>
+      ) : (
+        <button className={`${btn.primary} px-4 py-2 text-sm`} disabled={pending} onClick={() => start(() => setClockAction(24))}>
+          {pending ? "Moving time…" : "Skip to tomorrow"}
+        </button>
       ),
     },
     {
@@ -172,7 +180,7 @@ export function TourGuide({ state }: { state: TourState }) {
       {open && (
         <ol className="mt-4 space-y-2">
           {steps.map((s, i) => (
-            <li key={s.title} className={`rounded-2xl px-3 py-2.5 ${i === current ? "bg-white/80" : ""}`}>
+            <li key={s.title} className={`rounded-2xl px-3 py-2.5 ${i === current ? "bg-white/80" : "hidden sm:block"}`}>
               <div className="flex items-start gap-3">
                 <span
                   className={`mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${

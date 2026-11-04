@@ -110,13 +110,13 @@ export function buildTools(supabase: SupabaseClient, profile: Profile, origin: A
 
     get_provider_attendance: tool({
       description:
-        "A provider's attendance record: the share of booked visits they rendered, offered an alternative time for, or cancelled, with cancellation reasons. Use when the user asks how reliable a provider is.",
+        "A provider's attendance record: the share of booked visits they turned up for, offered an alternative time for, or cancelled, with cancellation reasons. Use when the user asks how reliable a provider is.",
       inputSchema: z.object({ provider_id: z.string() }),
       execute: async ({ provider_id }) => {
         const a = await attendanceFor(supabase, provider_id, nowFor(profile).toISOString());
         return {
           booked_visits: a.total,
-          rendered_pct: a.total ? Math.round((a.rendered / a.total) * 100) : null,
+          turned_up_pct: a.total ? Math.round((a.rendered / a.total) * 100) : null,
           alternative_pct: a.total ? Math.round((a.alternative / a.total) * 100) : null,
           cancelled_pct: a.total ? Math.round((a.cancelled / a.total) * 100) : null,
           recent_cancellations: a.items.filter((i) => i.outcome === "cancelled").slice(0, 5).map((i) => ({ when: fmtShort(i.at, tz), reason: i.note })),

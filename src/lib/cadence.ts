@@ -44,14 +44,27 @@ export const CADENCE_KEYS = Object.keys(CADENCES) as CadenceKey[];
 
 export const WEEKDAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+const TIMES_A_WEEK = ["", "Weekly", "Twice a week", "3 times a week", "4 times a week", "Every weekday", "6 days a week", "Every day"];
+
 export function cadenceLabel(key: string, weekdays?: number[]) {
   const c = CADENCES[key as CadenceKey];
   if (!c) return key;
   if (c.kind === "weekdays" && weekdays && weekdays.length) {
     const names = [...weekdays].sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map((d) => WEEKDAY_NAMES[d]);
-    return `${c.label} (${names.join(", ")})`;
+    // The days chosen decide how often, whatever the cadence was called ("weekly" on Mon to Fri is every weekday).
+    const days = new Set(weekdays);
+    const label = days.size === (c.defaultWeekdays?.length ?? 0) ? c.label : (TIMES_A_WEEK.at(days.size) ?? c.label);
+    return `${label} (${names.join(", ")})`;
   }
   return c.label;
+}
+
+/** Average visits a month for a cadence, counting the actual weekdays chosen. */
+export function visitsPerMonth(key: string, weekdays?: number[]) {
+  const c = CADENCES[key as CadenceKey];
+  if (!c) return 4.33;
+  if (c.kind === "weekdays" && weekdays && weekdays.length) return new Set(weekdays).size * 4.33;
+  return c.perMonth;
 }
 
 export function defaultWeekdays(key: string): number[] {

@@ -47,7 +47,7 @@ export default async function ProviderPage({ params, searchParams }: { params: P
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate">
                 <Rating value={provider.rating} count={provider.review_count} />
                 {distance != null && <span>{distance.toFixed(1)} km away</span>}
-                <span>{provider.years_experience} years experience</span>
+                <span>{provider.years_experience} {provider.years_experience === 1 ? "year" : "years"} of experience</span>
                 {provider.verified && <span className="font-bold text-sage">ID checked</span>}
               </div>
             </div>

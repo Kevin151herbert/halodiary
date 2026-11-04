@@ -16,14 +16,15 @@ async function tourState(supabase: SupabaseClient, profile: Profile): Promise<To
   const month = monthKey(nowFor(profile), profile.timezone);
   const since = profile.tour_started_at!;
   const count = (q: PromiseLike<{ count: number | null }>) => Promise.resolve(q).then((r) => (r.count ?? 0) > 0);
-  const [{ data: budget }, held, charged, asked, blocked] = await Promise.all([
+  const [{ data: budget }, held, charged, asked, blocked, checkWaiting] = await Promise.all([
     supabase.from("budgets").select("status, approval_mode").eq("client_id", profile.id).eq("month", month).maybeSingle(),
     count(supabase.from("ledger_entries").select("id", { count: "exact", head: true }).eq("client_id", profile.id).eq("kind", "hold")),
     count(supabase.from("ledger_entries").select("id", { count: "exact", head: true }).eq("client_id", profile.id).eq("kind", "capture")),
     count(supabase.from("activity_log").select("id", { count: "exact", head: true }).eq("user_id", profile.id).eq("actor", "assistant").not("action", "like", "Blocked:%").gte("created_at", since)),
     count(supabase.from("activity_log").select("id", { count: "exact", head: true }).eq("user_id", profile.id).eq("actor", "assistant").like("action", "Blocked:%").gte("created_at", since)),
+    count(supabase.from("visits").select("id", { count: "exact", head: true }).eq("client_id", profile.id).eq("status", "awaiting").is("client_response", null)),
   ]);
-  return { approved: budget?.status === "approved", paypal: budget?.approval_mode === "paypal_sandbox", held, charged, asked, blocked, month };
+  return { approved: budget?.status === "approved", paypal: budget?.approval_mode === "paypal_sandbox", held, charged, asked, blocked, checkWaiting, month };
 }
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {

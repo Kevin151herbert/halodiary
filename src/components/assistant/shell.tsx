@@ -5,7 +5,7 @@ import { DefaultChatTransport, lastAssistantMessageIsCompleteWithApprovalRespons
 import { Power, RotateCcw, Send, Sparkles, X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
-import { CADENCES, type CadenceKey } from "@/lib/cadence";
+import { cadenceLabel, defaultWeekdays, visitsPerMonth } from "@/lib/cadence";
 import { defaultTermsFor } from "@/lib/contract";
 import { toggleAssistantAction } from "@/app/app/actions";
 import { btn } from "../ui";
@@ -49,7 +49,8 @@ const APPROVE_LABEL: Record<string, string> = {
 
 function approvalText(name: string, input: Record<string, unknown> = {}) {
   if (name === "add_recurring_service") {
-    return `${input.service_name} with ${input.provider_name}, ${String(input.cadence).replace(/_/g, " ")}${input.time ? ` at ${input.time}` : ""}, ${input.price_per_visit} a visit.`;
+    const days = Array.isArray(input.weekdays) ? (input.weekdays as number[]) : undefined;
+    return `${input.service_name} with ${input.provider_name}, ${cadenceLabel(String(input.cadence), days).toLowerCase()}${input.time ? ` at ${input.time}` : ""}, ${input.price_per_visit} a visit.`;
   }
   return String(input.summary ?? name.replace(/_/g, " "));
 }
@@ -110,9 +111,9 @@ function ProviderResults({ output }: { output: unknown }) {
 /** What approving a new service means: the monthly cost and the agreement the assistant will sign for you. */
 function PlanTerms({ input }: { input: Record<string, unknown> }) {
   const price = Number(String(input.price_per_visit ?? "").replace(/[^0-9.]/g, "")) || 0;
-  const cadence = CADENCES[String(input.cadence) as CadenceKey];
   const t = defaultTermsFor(String(input.service_id ?? ""));
-  const monthly = price * (cadence?.perMonth ?? 4.3);
+  const weekdays = Array.isArray(input.weekdays) ? (input.weekdays as number[]) : defaultWeekdays(String(input.cadence));
+  const monthly = price * visitsPerMonth(String(input.cadence), weekdays);
   const code = String(input.price_per_visit ?? "").match(/[A-Z]{3}/)?.[0] ?? "EUR";
   const fmtMoney = (n: number) => new Intl.NumberFormat("en-GB", { style: "currency", currency: code, maximumFractionDigits: 0 }).format(n);
   return (

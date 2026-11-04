@@ -10,6 +10,10 @@ declare
   owner uuid;
   hrs integer;
 begin
+  -- A row that already carries its own time (for example a visit's charge, stamped when the visit ended) keeps it.
+  if new.created_at is not null and abs(extract(epoch from (new.created_at - now()))) > 5 then
+    return new;
+  end if;
   -- Read the owner through jsonb: a direct new.user_id on a ledger row fails, since that table has no such column.
   if tg_table_name = 'ledger_entries' then
     owner := (to_jsonb(new) ->> 'client_id')::uuid;

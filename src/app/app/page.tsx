@@ -106,7 +106,13 @@ export default async function DiaryPage({ searchParams }: { searchParams: Promis
           </div>
           <div className="clay-sm px-5 py-3">
             <p className="font-display text-3xl font-extrabold">{money(budget ? Number(budget.cap) : p.monthly_budget && Number(p.monthly_budget) >= forecast.total ? Number(p.monthly_budget) : forecast.cap, currency)}</p>
-            <p className="text-xs text-slate">{budget?.status === "approved" ? "budget approved" : "budget to approve"}</p>
+            <p className={`text-xs ${budget?.status === "approved" && forecast.total > Number(budget.cap) ? "font-bold text-rose" : "text-slate"}`}>
+              {budget?.status === "approved"
+                ? forecast.total > Number(budget.cap)
+                  ? `approved, forecast ${money(forecast.total, currency)} is over it`
+                  : "budget approved"
+                : "budget to approve"}
+            </p>
           </div>
         </div>
       </section>
@@ -135,7 +141,7 @@ export default async function DiaryPage({ searchParams }: { searchParams: Promis
 
       {(needsAnswer.length > 0 || (proposals?.length ?? 0) > 0) && (
         <section aria-labelledby="answers">
-          <h2 id="answers" className="text-xl font-bold">
+          <h2 id="answers" className="scroll-mt-24 text-xl font-bold">
             Day-before checks
           </h2>
           <p className="mt-1 text-sm text-slate">No answer by 2 hours before means the visit goes ahead as planned.</p>

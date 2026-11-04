@@ -99,7 +99,7 @@ export async function createPlan(
   const service = (ps.services as unknown as { name: string })?.name;
 
   // Version 1 of the agreement: the client signs by adding the service. Demo providers sign at once.
-  const signedAt = new Date().toISOString();
+  const signedAt = nowFor(profile).toISOString();
   const { data: contract, error: cErr } = await supabase
     .from("contracts")
     .insert({
@@ -431,7 +431,7 @@ export async function signAgreement(supabase: SupabaseClient, profile: Profile, 
   const c = await getContract(supabase, contractId);
   if (!c || c.status !== "pending") return { error: "There is no pending agreement to sign." };
   const asProvider = profile.role === "provider";
-  const at = new Date().toISOString();
+  const at = nowFor(profile).toISOString();
   const patch = asProvider ? { provider_signed_at: at } : { client_signed_at: at };
   const { error } = await supabase.from("contracts").update(patch).eq("id", c.id);
   if (error) return { error: error.message };
@@ -485,7 +485,7 @@ export async function proposeAmendment(
   // A newer proposal replaces any older one still waiting.
   await supabase.from("contracts").update({ status: "declined" }).eq("plan_id", input.planId).eq("status", "pending");
   const asProvider = profile.role === "provider";
-  const at = new Date().toISOString();
+  const at = nowFor(profile).toISOString();
   const autoAccept = !asProvider && c.providers?.is_demo;
   const { data: row, error } = await supabase
     .from("contracts")
