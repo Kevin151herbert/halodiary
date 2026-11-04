@@ -47,7 +47,7 @@ export async function buildContext(supabase: SupabaseClient, profile: Profile, p
     if (!plans?.length) lines.push("- none yet");
     for (const p of plans ?? [])
       lines.push(
-        `- plan ${p.id}: ${p.services?.name} with ${p.providers?.display_name} (provider ${p.provider_id}), ${cadenceLabel(p.cadence, p.weekdays)} at ${String(p.time_of_day).slice(0, 5)}, ${fmtMoney(Number(p.price), profile.currency)} a visit, status ${p.status}${p.created_by === "assistant" ? ", added by you, the assistant, after the user approved your card (if it was this chat, it is the plan your tool just created)" : p.created_by === "mcp" ? ", added by an outside AI agent" : ""}`,
+        `- plan ${p.id}: ${p.services?.name} with ${p.providers?.display_name} (provider ${p.provider_id}), ${cadenceLabel(p.cadence, p.weekdays)} at ${String(p.time_of_day).slice(0, 5)}, ${fmtMoney(Number(p.price), profile.currency)} a visit, status ${p.status}${p.created_by === "assistant" ? ", added by you, the assistant, after the user approved your card" : p.created_by === "mcp" ? ", added by an outside AI agent" : ""}`,
       );
 
     // Several plans for one service (weekday walks and weekend walks, say) are intended, not duplicates.
