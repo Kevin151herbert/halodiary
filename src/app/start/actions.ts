@@ -189,23 +189,28 @@ export async function startTourAction() {
     .eq("id", profile.id);
   const me = { ...profile, lat: city.lat, lng: city.lng, city: city.name, timezone: tz, monthly_budget: 800, clock_offset_hours: 0, agent_max_per_payment: 75 };
 
-  // First cleaning 38 to 62 hours away: no check yet, and one skip of a day brings it inside the 36-hour reminder.
+  // First cleaning 40 to 56 hours away: no check yet (cleaning reminds 36 hours before), and one skip of a day
+  // brings it inside that window. Daytime hours only, 10:00 when it fits.
   const now = new Date();
   const today = zParts(now, tz);
   let weekday = 2;
-  for (let n = 1; n <= 3; n++) {
+  let time = "10:00";
+  search: for (let n = 1; n <= 3; n++) {
     const d = addDays(today.y, today.m, today.d, n);
-    const at = zonedTime(d.y, d.m, d.d, 10, 0, tz);
-    const h = (at.getTime() - now.getTime()) / 3_600_000;
-    if (h >= 38 && h <= 62) {
-      weekday = at.getUTCDay();
-      break;
+    for (const hour of [10, 11, 9, 12, 14, 16, 18, 8, 19]) {
+      const at = zonedTime(d.y, d.m, d.d, hour, 0, tz);
+      const h = (at.getTime() - now.getTime()) / 3_600_000;
+      if (h >= 40 && h <= 56) {
+        weekday = new Date(Date.UTC(d.y, d.m - 1, d.d)).getUTCDay();
+        time = `${String(hour).padStart(2, "0")}:00`;
+        break search;
+      }
     }
   }
 
   const { data: services } = await supabase.from("services").select("id, typical_price, default_cadence").in("id", ["cleaning", "dog-walking"]);
   const picks = [
-    { id: "cleaning", cadence: "twice_weekly", weekdays: [weekday, (weekday + 3) % 7], time: "10:00" },
+    { id: "cleaning", cadence: "twice_weekly", weekdays: [weekday, (weekday + 3) % 7], time },
     { id: "dog-walking", cadence: "weekends", weekdays: [6, 0], time: "09:00" },
   ];
   const t = targets(
