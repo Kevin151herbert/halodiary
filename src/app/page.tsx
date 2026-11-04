@@ -182,6 +182,38 @@ export default function Landing() {
           })}
         </section>
 
+        <section aria-labelledby="why" className="mt-20">
+          <p className="text-xs font-bold uppercase tracking-wide text-slate">Why it matters</p>
+          <h2 id="why" className="mt-1 max-w-2xl text-3xl font-extrabold">A huge, everyday market still run on chats and bank transfers</h2>
+          <div className="mt-8 grid gap-4 sm:grid-cols-3">
+            {[
+              {
+                big: "$122 billion",
+                small: "spent on home services in Europe in 2025, growing about 7.7% a year to 2035.",
+                src: { label: "Expert Market Research", href: "https://www.expertmarketresearch.com/reports/europe-home-services-market" },
+              },
+              {
+                big: "Paid only after the visit",
+                small: "Clients approve a month once; each visit is held on PayPal and captured after it happens. No prepaying, no chasing.",
+              },
+              {
+                big: "90% to the provider",
+                small: "Providers are paid out through PayPal straight after each visit. HaloDiary keeps 10%, and agreements protect both sides from late changes.",
+              },
+            ].map((x) => (
+              <div key={x.big} className="clay p-6">
+                <p className="font-display text-2xl font-extrabold">{x.big}</p>
+                <p className="mt-2 text-sm leading-relaxed text-slate">{x.small}</p>
+                {x.src && (
+                  <a href={x.src.href} target="_blank" rel="noreferrer" className="mt-3 inline-block text-xs font-bold text-slate underline">
+                    Source: {x.src.label}
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+
         <section id="judges" className="clay mt-20 scroll-mt-8 p-6 sm:p-10">
           <div className="grid gap-10 lg:grid-cols-[1fr_1.2fr]">
             <div>
