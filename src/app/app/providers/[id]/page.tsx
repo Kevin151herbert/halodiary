@@ -20,7 +20,7 @@ export default async function ProviderPage({ params, searchParams }: { params: P
   const [{ data: provider }, { data: offers }, { data: reviews }, near, attendance] = await Promise.all([
     supabase.from("providers").select("*").eq("id", id).maybeSingle(),
     supabase.from("provider_services").select("price, services(*)").eq("provider_id", id),
-    supabase.from("reviews").select("*").eq("provider_id", id).order("created_at", { ascending: false }).limit(6),
+    supabase.from("reviews").select("*").eq("provider_id", id).order("created_at", { ascending: false }).limit(20),
     searchProviders(supabase, profile!, { radiusKm: 50 }),
     attendanceFor(supabase, id, nowFor(profile!).toISOString()),
   ]);
@@ -125,7 +125,11 @@ export default async function ProviderPage({ params, searchParams }: { params: P
 
           <h2 className="mt-10 text-xl font-bold">Recent reviews</h2>
           <ul className="mt-3 space-y-3">
-            {(reviews ?? []).map((r) => (
+            {(reviews ?? [])
+              // One review per person and wording, newest first: the demo seed repeats some texts.
+              .filter((r, i, all) => all.findIndex((x) => x.author_name === r.author_name || x.body === r.body) === i)
+              .slice(0, 6)
+              .map((r) => (
               <li key={r.id}>
                 <Card className="p-5">
                   <div className="flex items-center justify-between text-sm">
