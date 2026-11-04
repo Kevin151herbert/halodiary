@@ -93,11 +93,16 @@ export function TourGuide({ state }: { state: TourState }) {
     {
       done: state.asked,
       title: "Let the AI book something",
-      body: "Ask the assistant for a babysitter. It searches, picks, and asks you to approve before anything is booked or paid.",
+      body: "Ask the assistant for a babysitter. It searches, picks, and asks you to approve before anything is booked or paid. Your AI spending limit is €75 a payment: try a bigger one and watch it refuse.",
       action: (
-        <button className={`${btn.primary} px-4 py-2 text-sm`} onClick={() => askAssistant("Find me a babysitter for Saturday evenings and add it to my diary.")}>
-          Ask the assistant
-        </button>
+        <span className="flex flex-wrap gap-2">
+          <button className={`${btn.primary} px-4 py-2 text-sm`} onClick={() => askAssistant("Find me a babysitter for Saturday evenings and add it to my diary.")}>
+            Ask the assistant
+          </button>
+          <button className={`${btn.ghost} px-4 py-2 text-sm`} onClick={() => askAssistant("Add a car service every quarter with the best garage near me.")}>
+            Try going over the limit
+          </button>
+        </span>
       ),
     },
     {

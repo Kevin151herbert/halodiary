@@ -183,9 +183,11 @@ export async function startTourAction() {
       onboarded_at: new Date().toISOString(),
       tour_started_at: new Date().toISOString(),
       clock_offset_hours: 0,
+      // A visible AI spending limit, so the tour can show an agent being stopped by it.
+      agent_max_per_payment: 75,
     })
     .eq("id", profile.id);
-  const me = { ...profile, lat: city.lat, lng: city.lng, city: city.name, timezone: tz, monthly_budget: 500, clock_offset_hours: 0 };
+  const me = { ...profile, lat: city.lat, lng: city.lng, city: city.name, timezone: tz, monthly_budget: 500, clock_offset_hours: 0, agent_max_per_payment: 75 };
 
   // First cleaning 38 to 62 hours away: no check yet, and one skip of a day brings it inside the 36-hour reminder.
   const now = new Date();
