@@ -47,7 +47,7 @@ export async function buildContext(supabase: SupabaseClient, profile: Profile, p
     if (!plans?.length) lines.push("- none yet");
     for (const p of plans ?? [])
       lines.push(
-        `- plan ${p.id}: ${p.services?.name} with ${p.providers?.display_name} (provider ${p.provider_id}), ${cadenceLabel(p.cadence, p.weekdays)} at ${String(p.time_of_day).slice(0, 5)}, ${fmtMoney(Number(p.price), profile.currency)} a visit, status ${p.status}`,
+        `- plan ${p.id}: ${p.services?.name} with ${p.providers?.display_name} (provider ${p.provider_id}), ${cadenceLabel(p.cadence, p.weekdays)} at ${String(p.time_of_day).slice(0, 5)}, ${fmtMoney(Number(p.price), profile.currency)} a visit, status ${p.status}${Math.abs(now.getTime() - new Date(p.created_at).getTime()) < 3 * 3_600_000 ? " (added in the last few hours, possibly by you earlier in this chat: it is that same plan, not a second copy)" : ""}`,
       );
 
     // Several plans for one service (weekday walks and weekend walks, say) are intended, not duplicates.
