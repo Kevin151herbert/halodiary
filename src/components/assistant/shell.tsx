@@ -142,7 +142,19 @@ function ToolView({ part, onApprove }: { part: ToolPart; onApprove: (id: string,
   );
 }
 
-function Chat({ role, firstName, onDisable }: { role: string; firstName: string; onDisable: () => void }) {
+function Chat({
+  role,
+  firstName,
+  onDisable,
+  prompt,
+  onPromptSent,
+}: {
+  role: string;
+  firstName: string;
+  onDisable: () => void;
+  prompt?: string | null;
+  onPromptSent?: () => void;
+}) {
   const path = usePathname();
   const router = useRouter();
   const [input, setInput] = useState("");
@@ -179,6 +191,14 @@ function Chat({ role, firstName, onDisable }: { role: string; firstName: string;
     sendMessage({ text });
     setInput("");
   };
+
+  // A message handed over by the tour (or any other button) is sent once the history has loaded.
+  useEffect(() => {
+    if (!prompt || !loaded || busy) return;
+    sendMessage({ text: prompt });
+    onPromptSent?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prompt, loaded]);
 
   return (
     <>
@@ -294,7 +314,18 @@ export function AssistantShell({
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const [prompt, setPrompt] = useState<string | null>(null);
   const [pending, start] = useTransition();
+  useEffect(() => {
+    const onAsk = (e: Event) => {
+      const text = (e as CustomEvent<{ text?: string }>).detail?.text;
+      if (!text) return;
+      setOpen(true);
+      setPrompt(text);
+    };
+    window.addEventListener("halodiary:ask", onAsk);
+    return () => window.removeEventListener("halodiary:ask", onAsk);
+  }, []);
   const toggle = (on: boolean) => start(() => toggleAssistantAction(on));
   // In a chat thread the launcher would sit on top of the message box, so it moves up out of the way.
   const inThread = usePathname().startsWith("/app/messages/");
@@ -356,7 +387,7 @@ export function AssistantShell({
               <p className="mt-2 text-sm text-slate">This deployment needs an ANTHROPIC_API_KEY before the assistant can answer.</p>
             </div>
           ) : (
-            <Chat role={role} firstName={firstName} onDisable={() => toggle(false)} />
+            <Chat role={role} firstName={firstName} onDisable={() => toggle(false)} prompt={prompt} onPromptSent={() => setPrompt(null)} />
           )}
         </aside>
       )}

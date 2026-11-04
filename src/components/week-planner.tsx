@@ -103,8 +103,8 @@ export function WeekPlanner({
         mode: narrow ? "agenda" : "week",
         sidebar: false,
         modes: {
-          day: { dayStartTime: 7, dayEndTime: 22, hourHeight: 48 },
-          week: { dayStartTime: 7, dayEndTime: 22, hourHeight: 48 },
+          day: { dayStartTime: 7, dayEndTime: 22, hourHeight: 64 },
+          week: { dayStartTime: 7, dayEndTime: 22, hourHeight: 64 },
           month: null,
           year: null,
           agenda: { descriptionRenderer: () => "Next visits" },

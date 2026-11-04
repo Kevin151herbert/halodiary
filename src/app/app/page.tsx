@@ -1,3 +1,4 @@
+import { advanceIfStale } from "@/lib/engine";
 import { WeekPlanner } from "@/components/week-planner-lazy";
 import Link from "next/link";
 import { Avatar, ButtonLink, Card, Halo, money, StatusPill } from "@/components/ui";
@@ -23,6 +24,8 @@ export default async function DiaryPage({ searchParams }: { searchParams: Promis
   const fmtDay = (d: Date) => fmtDayZ(d, tz);
   const fmtTime = (d: Date) => fmtTimeZ(d, tz);
 
+  // The diary must have moved before it is read (this shares the layout's run).
+  await advanceIfStale(supabase, p);
   // Independent reads run together.
   const [visits, { data: plans }, { count: handled }, { data: proposals }, { data: recent }, { data: budget }, forecast] = await Promise.all([
     upcomingVisits(supabase, p, 14),

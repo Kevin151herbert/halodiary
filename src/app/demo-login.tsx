@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { btn } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
+import { startTourAction } from "./start/actions";
 
 const FIRST = ["Ana", "Marco", "Lucía", "Sam", "Priya", "Tom", "Elena", "Jonas", "Amara", "Leo", "Nadia", "Kai"];
 const LAST = "BCDFGHJKLMNPRSTVW";
@@ -16,7 +17,19 @@ function demoName() {
 }
 
 /** Creates a throwaway account in one click, so judges can explore without filling a form. */
-export function DemoLoginButton({ role = "client", label, variant = "halo", className = "" }: { role?: "client" | "provider"; label?: string; variant?: keyof typeof btn; className?: string }) {
+export function DemoLoginButton({
+  role = "client",
+  label,
+  variant = "halo",
+  className = "",
+  tour = false,
+}: {
+  role?: "client" | "provider";
+  label?: string;
+  variant?: keyof typeof btn;
+  className?: string;
+  tour?: boolean;
+}) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,6 +49,17 @@ export function DemoLoginButton({ role = "client", label, variant = "halo", clas
       setError(error?.message ?? "Instant demo needs email confirmation turned off in Supabase.");
       return;
     }
+    if (tour) {
+      const r = await startTourAction().catch(() => null);
+      if (!r?.ok) {
+        setBusy(false);
+        setError("The tour could not start. Try \"Start as a client\" instead.");
+        return;
+      }
+      router.push("/app");
+      router.refresh();
+      return;
+    }
     router.push(role === "provider" ? "/onboarding" : "/start");
     router.refresh();
   }
@@ -43,9 +67,14 @@ export function DemoLoginButton({ role = "client", label, variant = "halo", clas
   return (
     <div className="flex flex-col gap-2">
       <button onClick={go} disabled={busy} className={`${btn[variant]} ${className}`}>
-        {busy ? "Setting up…" : (label ?? (role === "provider" ? "Start as a provider" : "Start as a client"))}
+        {busy ? (tour ? "Preparing your household…" : "Setting up…") : (label ?? (role === "provider" ? "Start as a provider" : "Start as a client"))}
       </button>
       {error && <p className="max-w-xs text-sm text-rose">{error}</p>}
     </div>
   );
+}
+
+/** A small text button that starts a provider account, for the line under the main buttons. */
+export function DemoLinkProvider() {
+  return <DemoLoginButton role="provider" variant="quiet" label="start as a provider" className="!p-0 text-xs underline" />;
 }

@@ -1,7 +1,7 @@
 import { BadgeCheck, Bot, CalendarHeart, Clock, CreditCard, FileSignature, Heart, MessagesSquare, ShieldCheck, Sparkles, Star, Store, Wallet } from "lucide-react";
 import Link from "next/link";
 import { ButtonLink, Halo, IconChip, Logo, RingGauge } from "@/components/ui";
-import { DemoLoginButton } from "./demo-login";
+import { DemoLinkProvider, DemoLoginButton } from "./demo-login";
 
 const week = [
   { day: "Mon", n: 1, fill: 0.25 },
@@ -21,11 +21,11 @@ const HOW = [
 ];
 
 const JUDGE = [
-  ["Start as a client", "Tell the assistant your routine, set a budget, swipe right on your matches and sign."],
-  ["Approve with PayPal", "On Budget, approve the month with a PayPal sandbox personal account. No real money moves."],
-  ["Jump ahead", "On the Diary, press +1 day on the demo clock. Checks go out, money is held, providers are paid."],
-  ["Chat like a client", "Open Messages, ask for an extra service, pay the quote with the PayPal button, then rate the visit."],
-  ["Switch sides", "Start as a provider: build a profile, load sample clients, accept a new client and see your attendance score."],
+  ["Take the tour", "One click gives you a household with a cleaner and a dog walker already booked. A checklist walks you through the rest."],
+  ["Approve with PayPal", "Approve the month once with a PayPal sandbox account. No real money moves, and nothing is charged until a visit happens."],
+  ["Skip to tomorrow", "Confirm the day-before check: PayPal holds the price. Skip past the visit: it is charged and the cleaner is paid out."],
+  ["Let the AI book", "Ask the assistant for a babysitter. It books after your one-tap approval, inside your spending limit."],
+  ["Switch sides", "See the provider's schedule, attendance score and payouts, or start as a provider to build your own listing."],
 ];
 
 export default function Landing() {
@@ -53,18 +53,28 @@ export default function Landing() {
               <Sparkles size={14} className="text-halo" aria-hidden /> PayPal + AI Hackathon entry
             </p>
             <h1 className="mt-5 max-w-xl text-[2.5rem] font-extrabold leading-[1.03] sm:text-6xl">
-              Your home&apos;s recurring services, run by an AI on a PayPal budget.
+              Book it once. HaloDiary and your AI handle the rest.
             </h1>
             <p className="mt-6 max-w-lg text-lg leading-relaxed text-slate">
-              Cleaning twice a week, tutoring three times, the dog walker at weekends, the car every quarter. Stop searching, messaging, reminding and paying
-              one by one. HaloDiary finds reliable people near you, books them, checks with everyone before each visit, and pays through PayPal inside a
-              budget you approve once a month.
+              The cleaner twice a week, the tutor after school, the dog walker at weekends. HaloDiary books them, checks with everyone the day before, holds
+              each visit on PayPal and pays only after it happens, inside a budget you approve once. Your AI, or any agent you connect, can book and pay too,
+              never past the limit you set.
             </p>
             <div className="mt-8 flex flex-wrap items-start gap-3">
-              <DemoLoginButton role="client" className="px-7 py-3.5" />
-              <DemoLoginButton role="provider" variant="ghost" className="px-6 py-3.5" />
+              <DemoLoginButton role="client" tour label="Take the 90-second tour" className="px-7 py-3.5" />
+              <DemoLoginButton role="client" variant="ghost" label="Set up my own household" className="px-6 py-3.5" />
             </div>
-            <p className="mt-3 text-xs text-slate">One click, no email needed. Payments run in the PayPal sandbox.</p>
+            <div className="mt-3 flex flex-wrap items-center gap-x-1 text-xs text-slate">
+              <span>One click, no email. The tour gives you a ready household in Barcelona; payments run in the PayPal sandbox. Run a service business?</span>
+              <DemoLinkProvider />
+            </div>
+            <ul className="mt-6 flex flex-wrap gap-2 text-[11px] font-bold text-slate" aria-label="Built on">
+              {["PayPal Vault", "Orders and authorisations", "Payouts", "Subscriptions", "Invoicing", "Webhooks", "Agent Toolkit", "MCP"].map((x) => (
+                <li key={x} className="clay-sm px-2.5 py-1">
+                  {x}
+                </li>
+              ))}
+            </ul>
           </div>
 
           <div className="relative">
@@ -182,7 +192,7 @@ export default function Landing() {
                 chat in character.
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
-                <DemoLoginButton role="client" />
+                <DemoLoginButton role="client" tour label="Take the 90-second tour" />
                 <DemoLoginButton role="provider" variant="ghost" />
               </div>
               <ul className="mt-8 space-y-2 text-sm">

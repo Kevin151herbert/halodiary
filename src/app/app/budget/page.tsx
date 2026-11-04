@@ -1,3 +1,4 @@
+import { advanceIfStale } from "@/lib/engine";
 import { Card, Meter, money } from "@/components/ui";
 import { forecastMonth, monthKey, nowFor, spentInMonth } from "@/lib/engine";
 import { paypalConfigured } from "@/lib/paypal";
@@ -43,6 +44,8 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
   const month = m === "next" ? nextMonth : thisMonth;
   const label = monthLabel(month);
 
+  // The diary must have moved before it is read (this shares the layout's run).
+  await advanceIfStale(supabase, p);
   const [raw, { data: budget }, used, { data: ledger }, { data: openCredits }] = await Promise.all([
     forecastMonth(supabase, p, month),
     supabase.from("budgets").select("*").eq("client_id", p.id).eq("month", month).maybeSingle(),

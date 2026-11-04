@@ -451,22 +451,25 @@ export async function releaseHold(supabase: SupabaseClient, profile: Profile, v:
 // When the app last ran the scheduler for each user (per server instance), keyed with the demo clock so a
 // clock jump always runs it. Every action that changes visits calls advance() itself, and the Render cron
 // covers everyone in the background, so page loads only need it when it is a little stale.
-const lastAdvance = new Map<string, number>();
+const lastAdvance = new Map<string, { at: number; run: Promise<void> }>();
 const ADVANCE_EVERY_MS = 60_000;
 
-/** advance(), skipped when it already ran for this user and demo clock in the last minute. */
+/**
+ * advance(), skipped when it already ran for this user and demo clock in the last minute. The layout and the
+ * page render at the same time, so a run in progress is shared: whoever asks second waits for the same run
+ * instead of reading the diary before it has moved.
+ */
 export async function advanceIfStale(supabase: SupabaseClient, profile: Profile) {
   if (profile.role !== "client") return;
   const key = `${profile.id}:${profile.clock_offset_hours}`;
-  const last = lastAdvance.get(key) ?? 0;
-  if (Date.now() - last < ADVANCE_EVERY_MS) return;
-  lastAdvance.set(key, Date.now());
-  try {
-    await advance(supabase, profile);
-  } catch (e) {
+  const last = lastAdvance.get(key);
+  if (last && Date.now() - last.at < ADVANCE_EVERY_MS) return last.run;
+  const run = advance(supabase, profile).catch((e) => {
     lastAdvance.delete(key);
     throw e;
-  }
+  });
+  lastAdvance.set(key, { at: Date.now(), run });
+  return run;
 }
 
 export async function advance(supabase: SupabaseClient, profile: Profile) {

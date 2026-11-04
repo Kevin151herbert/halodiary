@@ -6,6 +6,24 @@ import { advanceIfStale, nowFor } from "@/lib/engine";
 import { getSession } from "@/lib/supabase/server";
 import { fmtShort } from "@/lib/time";
 import { Nav } from "./nav";
+import { TourGuide, type TourState } from "./tour-guide";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Profile } from "@/lib/supabase/server";
+import { monthKey } from "@/lib/engine";
+
+/** What the tour visitor has already done, read from their own account. */
+async function tourState(supabase: SupabaseClient, profile: Profile): Promise<TourState> {
+  const month = monthKey(nowFor(profile), profile.timezone);
+  const since = profile.tour_started_at!;
+  const count = (q: PromiseLike<{ count: number | null }>) => Promise.resolve(q).then((r) => (r.count ?? 0) > 0);
+  const [{ data: budget }, held, charged, asked] = await Promise.all([
+    supabase.from("budgets").select("status, approval_mode").eq("client_id", profile.id).eq("month", month).maybeSingle(),
+    count(supabase.from("ledger_entries").select("id", { count: "exact", head: true }).eq("client_id", profile.id).eq("kind", "hold")),
+    count(supabase.from("ledger_entries").select("id", { count: "exact", head: true }).eq("client_id", profile.id).eq("kind", "capture")),
+    count(supabase.from("activity_log").select("id", { count: "exact", head: true }).eq("user_id", profile.id).eq("actor", "assistant").gte("created_at", since)),
+  ]);
+  return { approved: budget?.status === "approved", paypal: budget?.approval_mode === "paypal_sandbox", held, charged, asked, month };
+}
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const { supabase, profile } = await getSession();
@@ -16,9 +34,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // Move visits along the timeline (day-before checks, holds, captures) before rendering.
   await advanceIfStale(supabase, profile);
 
-  const [{ count: unread }, chats] = await Promise.all([
+  const touring = profile.role === "client" && Boolean(profile.tour_started_at) && !profile.tour_dismissed_at;
+  const [{ count: unread }, chats, tour] = await Promise.all([
     supabase.from("notifications").select("id", { count: "exact", head: true }).eq("user_id", profile.id).is("read_at", null),
     unreadCount(supabase, profile),
+    touring ? tourState(supabase, profile) : Promise.resolve(null),
   ]);
   const now = nowFor(profile);
   const aiConfigured = Boolean(process.env.ANTHROPIC_API_KEY);
@@ -50,7 +70,10 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           <header className="sticky top-0 z-20 flex items-center justify-between bg-paper/85 px-5 py-3 backdrop-blur md:hidden">
             <Logo />
           </header>
-          <main className="mx-auto w-full max-w-5xl flex-1 px-5 pb-28 pt-6 sm:px-8 md:pb-12 md:pt-10">{children}</main>
+          <main className="mx-auto w-full max-w-5xl flex-1 px-5 pb-28 pt-6 sm:px-8 md:pb-12 md:pt-10">
+            {tour && <TourGuide state={tour} />}
+            {children}
+          </main>
           <div className="clay fixed inset-x-3 bottom-3 z-20 md:hidden">
             <Nav role={profile.role} unread={unread ?? 0} chats={chats} compact />
           </div>

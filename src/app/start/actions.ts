@@ -11,7 +11,8 @@ import { attendanceFor } from "@/lib/attendance";
 import { log, nowFor } from "@/lib/engine";
 import { rankProviders, targets, type Match } from "@/lib/match";
 import { getSession } from "@/lib/supabase/server";
-import { fmt, isValidTz } from "@/lib/time";
+import { CITIES } from "@/lib/cities";
+import { addDays, fmt, isValidTz, zParts, zonedTime } from "@/lib/time";
 
 const model = () => anthropic(process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5");
 
@@ -160,4 +161,67 @@ export async function providerPreviewAction(providerId: string, serviceId: strin
       recentCancellations: attendance.items.filter((i) => i.outcome === "cancelled").slice(0, 3).map((i) => i.note),
     },
   };
+}
+
+/**
+ * The 90-second judge tour: a ready household in Barcelona with two recurring services from the best matches,
+ * timed so the first cleaning's day-before check arrives after one "Skip to tomorrow".
+ */
+export async function startTourAction() {
+  const { supabase, profile } = await session();
+  const city = CITIES.find((c) => c.name === "Barcelona")!;
+  const tz = "Europe/Madrid";
+  await supabase
+    .from("profiles")
+    .update({
+      lat: city.lat,
+      lng: city.lng,
+      city: city.name,
+      timezone: tz,
+      interests: ["cleaning", "dog-walking"],
+      monthly_budget: 500,
+      onboarded_at: new Date().toISOString(),
+      tour_started_at: new Date().toISOString(),
+      clock_offset_hours: 0,
+    })
+    .eq("id", profile.id);
+  const me = { ...profile, lat: city.lat, lng: city.lng, city: city.name, timezone: tz, monthly_budget: 500, clock_offset_hours: 0 };
+
+  // First cleaning 38 to 62 hours away: no check yet, and one skip of a day brings it inside the 36-hour reminder.
+  const now = new Date();
+  const today = zParts(now, tz);
+  let weekday = 2;
+  for (let n = 1; n <= 3; n++) {
+    const d = addDays(today.y, today.m, today.d, n);
+    const at = zonedTime(d.y, d.m, d.d, 10, 0, tz);
+    const h = (at.getTime() - now.getTime()) / 3_600_000;
+    if (h >= 38 && h <= 62) {
+      weekday = at.getUTCDay();
+      break;
+    }
+  }
+
+  const { data: services } = await supabase.from("services").select("id, typical_price, default_cadence").in("id", ["cleaning", "dog-walking"]);
+  const picks = [
+    { id: "cleaning", cadence: "twice_weekly", weekdays: [weekday, (weekday + 3) % 7], time: "10:00" },
+    { id: "dog-walking", cadence: "weekends", weekdays: [6, 0], time: "09:00" },
+  ];
+  const t = targets(
+    500,
+    picks.map((p) => ({ id: p.id, cadence: p.cadence, typical_price: Number(services?.find((s) => s.id === p.id)?.typical_price ?? 20) })),
+  );
+  for (const p of picks) {
+    const best = (await rankProviders(supabase, me, p.id, t[p.id] ?? null, me.currency))[0];
+    if (!best) continue;
+    await core.createPlan(supabase, me, { providerId: best.provider_id, serviceId: p.id, cadence: p.cadence, weekdays: p.weekdays, time: p.time }, "user");
+  }
+  await log(supabase, profile.id, "user", "Started the guided tour");
+  revalidatePath("/app", "layout");
+  return { ok: true };
+}
+
+export async function dismissTourAction() {
+  const { supabase, profile } = await session();
+  await supabase.from("profiles").update({ tour_dismissed_at: new Date().toISOString() }).eq("id", profile.id);
+  revalidatePath("/app", "layout");
 }

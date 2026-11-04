@@ -8,7 +8,7 @@ import * as problems from "@/lib/problems";
 import { invoiceForRequest, sendMonthlyStatement } from "@/lib/paypal-agent";
 import * as subs from "@/lib/subscriptions";
 import { headers } from "next/headers";
-import { log } from "@/lib/engine";
+import { advanceIfStale, log } from "@/lib/engine";
 import { getSession } from "@/lib/supabase/server";
 
 async function session() {
@@ -112,6 +112,8 @@ export async function setClockAction(hours: number) {
   const next = hours === 0 ? 0 : profile.clock_offset_hours + hours;
   await supabase.from("profiles").update({ clock_offset_hours: next }).eq("id", profile.id);
   await log(supabase, profile.id, "user", hours === 0 ? "Reset the demo clock" : `Moved the demo clock forward ${hours} hours`);
+  // Move the diary along now, so the page that re-renders after this already shows the checks, holds and payouts.
+  await advanceIfStale(supabase, { ...profile, clock_offset_hours: next });
   done();
 }
 
