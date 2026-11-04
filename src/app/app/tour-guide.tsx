@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { btn } from "@/components/ui";
 import { dismissTourAction } from "../start/actions";
-import { setClockAction } from "./actions";
+import { moveClock } from "./move-clock";
 
 export type TourState = { approved: boolean; paypal: boolean; held: boolean; charged: boolean; asked: boolean; blocked: boolean; checkWaiting: boolean; month: string };
 
@@ -98,7 +98,7 @@ export function TourGuide({ state }: { state: TourState }) {
           Show me the check
         </button>
       ) : (
-        <button className={`${btn.primary} px-4 py-2 text-sm`} disabled={pending} onClick={() => start(() => setClockAction(24))}>
+        <button className={`${btn.primary} px-4 py-2 text-sm`} disabled={pending} onClick={() => start(() => moveClock(24))}>
           {pending ? "Moving time…" : "Skip to tomorrow"}
         </button>
       ),
@@ -108,7 +108,7 @@ export function TourGuide({ state }: { state: TourState }) {
       title: "Skip past the visit",
       body: "The cleaning happens. PayPal captures the hold and the cleaner is paid out. Watch it under \"Where your money is\".",
       action: (
-        <button className={`${btn.primary} px-4 py-2 text-sm`} disabled={pending} onClick={() => start(() => setClockAction(72))}>
+        <button className={`${btn.primary} px-4 py-2 text-sm`} disabled={pending} onClick={() => start(() => moveClock(72))}>
           {pending ? "Moving time…" : "Skip ahead 3 days"}
         </button>
       ),

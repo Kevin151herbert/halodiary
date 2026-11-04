@@ -7,10 +7,10 @@ import {
   planStatusAction,
   providerAction,
   respondAction,
-  setClockAction,
   startSubscriptionAction,
   stopSubscriptionAction,
 } from "./actions";
+import { moveClock } from "./move-clock";
 
 // Times typed here are wall-clock times in the user's own time zone; the server reads them that way.
 export function VisitAnswer({
@@ -156,17 +156,17 @@ export function DemoClock({ offsetHours }: { offsetHours: number }) {
         {offsetHours !== 0 && ` You are ${offsetHours >= 24 ? `${Math.round(offsetHours / 24)} day${Math.round(offsetHours / 24) === 1 ? "" : "s"}` : `${offsetHours} hours`} ahead.`}
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
-        <button className={btn.primary} disabled={pending} onClick={() => start(() => setClockAction(24))}>
+        <button className={btn.primary} disabled={pending} onClick={() => start(() => moveClock(24))}>
           {pending ? "Moving time…" : "Skip to tomorrow"}
         </button>
-        <button className={btn.ghost} disabled={pending} onClick={() => start(() => setClockAction(12))}>
+        <button className={btn.ghost} disabled={pending} onClick={() => start(() => moveClock(12))}>
           +12 hours
         </button>
-        <button className={btn.ghost} disabled={pending} onClick={() => start(() => setClockAction(72))}>
+        <button className={btn.ghost} disabled={pending} onClick={() => start(() => moveClock(72))}>
           +3 days
         </button>
         {offsetHours !== 0 && (
-          <button className={btn.quiet} disabled={pending} onClick={() => start(() => setClockAction(0))}>
+          <button className={btn.quiet} disabled={pending} onClick={() => start(() => moveClock(0))}>
             Back to real time
           </button>
         )}
