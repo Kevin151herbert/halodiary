@@ -12,7 +12,7 @@ import { log, nowFor } from "@/lib/engine";
 import { rankProviders, targets, type Match } from "@/lib/match";
 import { getSession } from "@/lib/supabase/server";
 import { CITIES } from "@/lib/cities";
-import { addDays, fmt, isValidTz, zParts, zonedTime } from "@/lib/time";
+import { addDays, fmt, isValidTz, zParts, zonedTime, fmtMoney } from "@/lib/time";
 
 const model = () => anthropic(process.env.ANTHROPIC_MODEL || "claude-sonnet-5-5");
 
@@ -121,7 +121,7 @@ export async function finishStartAction(input: {
     if ("error" in res && res.error) return { error: res.error };
     if ("summary" in res && res.summary) added.push(res.summary);
   }
-  await log(supabase, profile.id, "user", `Finished setup: ${added.length} services, ${profile.currency} ${input.budget} a month`, { interests: input.interests });
+  await log(supabase, profile.id, "user", `Finished setup: ${added.length} services, ${fmtMoney(Number(input.budget), profile.currency)} a month`, { interests: input.interests });
   revalidatePath("/app", "layout");
   if (!added.length) redirect("/app/discover");
   redirect("/app/budget?welcome=1");

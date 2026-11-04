@@ -121,3 +121,8 @@ export function isValidTz(tz: string | null | undefined) {
     return false;
   }
 }
+
+/** Money as people read it: "€41.00", in the account's currency. */
+export function fmtMoney(n: number, currency: string) {
+  return new Intl.NumberFormat("en-GB", { style: "currency", currency }).format(n);
+}

@@ -1,3 +1,4 @@
+import { fmtMoney } from "./time";
 import "server-only";
 // Flat monthly plans as PayPal Subscriptions: the product comes from the PayPal Agent Toolkit,
 // the billing plan and subscription from the PayPal Server SDK. Visits on a subscribed plan are
@@ -40,7 +41,7 @@ export async function startSubscription(supabase: SupabaseClient, profile: Profi
     cancelUrl: `${origin}/app?subscription=cancelled`,
   });
   await supabase.from("plans").update({ paypal_subscription_id: sub.id, subscription_status: "APPROVAL_PENDING", monthly_price: amount }).eq("id", plan.id);
-  await log(supabase, profile.id, "user", `Started a ${profile.currency} ${amount} monthly PayPal subscription for ${service}`, { plan: plan.id, subscription: sub.id });
+  await log(supabase, profile.id, "user", `Started a ${fmtMoney(Number(amount), profile.currency)} monthly PayPal subscription for ${service}`, { plan: plan.id, subscription: sub.id });
   return { approveUrl: sub.approveUrl, amount };
 }
 

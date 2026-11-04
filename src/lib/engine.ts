@@ -7,7 +7,7 @@ import { defaultTermsFor, governingContract, planIdForVisit, providerChangeCredi
 import { fingerprint } from "./contract-hash";
 import * as paypal from "./paypal";
 import type { Profile } from "./supabase/server";
-import { fmtDay as fmtDayZ, fmtTime as fmtTimeZ, monthKey, monthRange } from "./time";
+import { fmtDay as fmtDayZ, fmtTime as fmtTimeZ, monthKey, monthRange, fmtMoney } from "./time";
 
 export const COMMISSION = 0.1; // HaloDiary keeps 10%; the provider gets the rest
 export const CHECK_WINDOW_HOURS = 24; // day-before check
@@ -259,7 +259,7 @@ async function holdPayment(supabase: SupabaseClient, profile: Profile, v: VisitR
       profile.id,
       "budget_cap",
       "This visit would go over your monthly cap",
-      `${v.services?.name} (${profile.currency} ${Number(v.price).toFixed(2)}) needs a budget increase before it can be confirmed.`,
+      `${v.services?.name} (${fmtMoney(Number(v.price), profile.currency)}) needs a budget increase before it can be confirmed.`,
       v.id,
     );
     return false;
@@ -298,7 +298,7 @@ async function holdPayment(supabase: SupabaseClient, profile: Profile, v: VisitR
     paypal_ref: authId,
     mode,
   });
-  await log(supabase, profile.id, "system", `Held ${profile.currency} ${Number(v.price).toFixed(2)} for ${v.services?.name}`, {
+  await log(supabase, profile.id, "system", `Held ${fmtMoney(Number(v.price), profile.currency)} for ${v.services?.name}`, {
     visit: v.id,
     mode,
   });
@@ -377,7 +377,7 @@ export async function completeVisit(supabase: SupabaseClient, profile: Profile, 
   }
 
   await supabase.from("visits").update({ status: "completed" }).eq("id", v.id);
-  const note = creditUsed ? `${cur} ${creditUsed.toFixed(2)} agreement credit applied` : "";
+  const note = creditUsed ? `${fmtMoney(creditUsed, cur)} agreement credit applied` : "";
   await supabase.from("ledger_entries").insert([
     { client_id: profile.id, visit_id: v.id, provider_id: v.provider_id, kind: "capture", amount: charge, paypal_ref: captureId, mode, note },
     { client_id: profile.id, visit_id: v.id, provider_id: v.provider_id, kind: "payout", amount: providerShare, paypal_ref: payoutId, mode: payoutMode, note },
@@ -387,8 +387,8 @@ export async function completeVisit(supabase: SupabaseClient, profile: Profile, 
     supabase,
     profile.id,
     "payment",
-    `${v.services?.name} done, ${cur} ${charge.toFixed(2)} paid`,
-    `${v.providers?.display_name} received ${cur} ${providerShare.toFixed(2)} through PayPal.${creditUsed ? ` Your ${cur} ${creditUsed.toFixed(2)} credit was taken off.` : ""}`,
+    `${v.services?.name} done, ${fmtMoney(charge, cur)} paid`,
+    `${v.providers?.display_name} received ${fmtMoney(providerShare, cur)} through PayPal.${creditUsed ? ` Your ${fmtMoney(creditUsed, cur)} credit was taken off.` : ""}`,
     v.id,
   );
   await log(supabase, profile.id, actor, `Completed ${v.services?.name}; captured and paid ${v.providers?.display_name}`, {
@@ -435,7 +435,7 @@ export async function chargeFee(supabase: SupabaseClient, profile: Profile, v: V
     { client_id: profile.id, visit_id: v.id, provider_id: v.provider_id, kind: "fee", amount, paypal_ref: feeRef, mode, note: reason },
     { client_id: profile.id, visit_id: v.id, provider_id: v.provider_id, kind: "payout", amount: providerShare, paypal_ref: payoutRef, mode: payoutMode, note: "Late change fee" },
   ]);
-  await log(supabase, profile.id, "system", `Charged a ${cur} ${amount.toFixed(2)} late change fee for ${v.services?.name}`, { visit: v.id, reason, mode });
+  await log(supabase, profile.id, "system", `Charged a ${fmtMoney(amount, cur)} late change fee for ${v.services?.name}`, { visit: v.id, reason, mode });
 }
 
 /** Release a hold (skipped or cancelled visit). */
@@ -550,7 +550,7 @@ export async function advance(supabase: SupabaseClient, profile: Profile) {
         profile.id,
         "provider_cancelled",
         `${v.providers?.display_name} cancelled ${v.services?.name}, ${fmtDay(new Date(v.scheduled_at))}`,
-        `Reason: ${v.cancel_reason || "not given"}. Nothing is charged for this visit.${c?.credit ? ` Under your agreement you get a ${profile.currency} ${c.credit.toFixed(2)} credit on the next payment.` : ""}`,
+        `Reason: ${v.cancel_reason || "not given"}. Nothing is charged for this visit.${c?.credit ? ` Under your agreement you get a ${fmtMoney(c.credit, profile.currency)} credit on the next payment.` : ""}`,
         v.id,
       );
       await log(supabase, profile.id, "system", `${v.providers?.display_name} cancelled ${v.services?.name}`, { visit: v.id, reason: v.cancel_reason });
@@ -566,7 +566,7 @@ export async function advance(supabase: SupabaseClient, profile: Profile) {
         mode: "simulated",
         note: c.reason,
       });
-      await log(supabase, profile.id, "system", `Agreement credit of ${profile.currency} ${c.credit.toFixed(2)} from ${v.providers?.display_name}`, {
+      await log(supabase, profile.id, "system", `Agreement credit of ${fmtMoney(c.credit, profile.currency)} from ${v.providers?.display_name}`, {
         visit: v.id,
         reason: c.reason,
       });

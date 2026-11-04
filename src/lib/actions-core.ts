@@ -17,7 +17,7 @@ import {
 import { fingerprint } from "./contract-hash";
 import { advance, chargeFee, completeVisit, ensureVisits, forecastMonth, log, notifyProvider, nowFor, releaseHold, VISIT_SELECT, type VisitRow } from "./engine";
 import type { Profile } from "./supabase/server";
-import { dayKey, fmtShort, monthKey, monthLabel, monthRange, parseLocalInput } from "./time";
+import { dayKey, fmtShort, monthKey, monthLabel, monthRange, parseLocalInput, fmtMoney } from "./time";
 
 type Actor = "user" | "assistant";
 
@@ -137,7 +137,7 @@ export async function createPlan(
   }
   await ensureVisits(supabase, profile);
   await advance(supabase, profile);
-  return { plan, contractId: contract.id, summary: `${service} with ${provider}, ${cadenceLabel(input.cadence, weekdays)} at ${(input.time || "10:00").slice(0, 5)}, ${profile.currency} ${Number(ps.price).toFixed(2)} a visit` };
+  return { plan, contractId: contract.id, summary: `${service} with ${provider}, ${cadenceLabel(input.cadence, weekdays)} at ${(input.time || "10:00").slice(0, 5)}, ${fmtMoney(Number(ps.price), profile.currency)} a visit` };
 }
 
 export async function setPlanStatus(supabase: SupabaseClient, profile: Profile, planId: string, status: "active" | "paused" | "ended", actor: Actor) {
@@ -255,7 +255,7 @@ export async function clientRespond(
       supabase,
       profile.id,
       actor,
-      `Skipped ${name}, ${cost?.fee ? `${profile.currency} ${cost.fee.toFixed(2)} late fee under the agreement` : "nothing charged"}`,
+      `Skipped ${name}, ${cost?.fee ? `${fmtMoney(cost.fee, profile.currency)} late fee under the agreement` : "nothing charged"}`,
       { visit: v.id },
     );
     await notifyProvider(supabase, v, "client_change", `${profile.full_name || "Your client"} skipped ${name}, ${fmtShort(v.scheduled_at, profile.timezone)}`, cost?.fee ? `Late change: you receive the agreed fee.` : "");
@@ -289,7 +289,7 @@ export async function clientRespond(
       supabase,
       profile.id,
       actor,
-      `Moved ${name} to ${fmtShort(at, profile.timezone)}${cost?.fee ? `, ${profile.currency} ${cost.fee.toFixed(2)} late fee under the agreement` : ""}`,
+      `Moved ${name} to ${fmtShort(at, profile.timezone)}${cost?.fee ? `, ${fmtMoney(cost.fee, profile.currency)} late fee under the agreement` : ""}`,
       { visit: moved?.id, from: v.scheduled_at },
     );
     await notifyProvider(
@@ -384,7 +384,7 @@ export async function approveBudget(
     { onConflict: "client_id,month" },
   );
   if (error) return { error: error.message };
-  await log(supabase, profile.id, actor, `Approved a ${profile.currency} ${cap.toFixed(2)} budget for ${monthLabel(input.month)}`, {
+  await log(supabase, profile.id, actor, `Approved a ${fmtMoney(cap, profile.currency)} budget for ${monthLabel(input.month)}`, {
     mode: input.mode,
   });
   await advance(supabase, profile);
