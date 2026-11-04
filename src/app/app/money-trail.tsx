@@ -84,7 +84,7 @@ export async function MoneyTrail({ supabase, profile }: { supabase: SupabaseClie
                         ) : (
                           <Clock size={14} aria-label="Not yet" />
                         )}
-                        {s.label}
+                        {s.key === "hold" && l && !paypal ? "Held (simulated)" : s.label}
                       </span>
                       {l ? (
                         <span className="mt-1 block text-slate">
