@@ -81,7 +81,11 @@ export function LedgerGrid({ rows, currency, fileName, partyLabel = "Provider" }
     [money, partyLabel],
   );
 
-  const total = rows.reduce((s, r) => s + (["Charged", "Late change fee", "Extra paid in chat"].includes(r.what) ? r.amount : r.what === "Refunded" ? r.amount : 0), 0);
+  // Clients see what they were charged; providers (whose rows name the client) see what they were paid out.
+  const forProvider = partyLabel === "Client";
+  const total = forProvider
+    ? rows.reduce((s, r) => s + (r.what === "Payout" ? r.amount : 0), 0)
+    : rows.reduce((s, r) => s + (["Charged", "Late change fee", "Extra paid in chat"].includes(r.what) ? r.amount : r.what === "Refunded" ? r.amount : 0), 0);
 
   return (
     <div>
@@ -92,7 +96,7 @@ export function LedgerGrid({ rows, currency, fileName, partyLabel = "Provider" }
           <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search by provider, service or PayPal reference" className={`${field} pl-9`} />
         </label>
         <span className="text-sm text-slate">
-          Net charged: <span className="font-bold text-ink">{money.format(total)}</span>
+          {forProvider ? "Paid out" : "Net charged"}: <span className="font-bold text-ink">{money.format(total)}</span>
         </span>
         <button type="button" className={btn.ghost} onClick={() => grid.current?.api.exportDataAsCsv({ fileName })}>
           <Download size={16} aria-hidden /> CSV

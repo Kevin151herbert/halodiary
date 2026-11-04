@@ -15,7 +15,7 @@ export async function POST(req: Request) {
 
   const { messages, page }: { messages: UIMessage[]; page?: string } = await req.json();
   const context = await buildContext(supabase, profile, page ?? "/app");
-  const { tools, approval } = buildTools(supabase, profile);
+  const { tools, approval, precheck } = buildTools(supabase, profile);
 
   const instructions = `You are the HaloDiary assistant: an AI teammate inside an app that runs a household's recurring services (cleaning, tutoring, dog walking, pool care, car servicing and more) like subscriptions, with PayPal handling payment inside a monthly budget the client approves once.
 
@@ -43,7 +43,10 @@ ${context}`;
     instructions,
     messages: await convertToModelMessages(messages),
     tools,
-    toolApproval: Object.fromEntries(approval.map((name) => [name, "user-approval" as const])),
+    // A call that the spending limit or the monthly budget would refuse skips the approval card and returns its refusal.
+    toolApproval: Object.fromEntries(
+      approval.map((name) => [name, async (input: unknown) => ((await precheck(name, (input ?? {}) as Record<string, unknown>)) ? ("not-applicable" as const) : ("user-approval" as const))]),
+    ),
     ...(process.env.TOOL_APPROVAL_SECRET ? { experimental_toolApprovalSecret: process.env.TOOL_APPROVAL_SECRET } : {}),
     stopWhen: isStepCount(8),
   });

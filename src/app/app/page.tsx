@@ -42,6 +42,10 @@ export default async function DiaryPage({ searchParams }: { searchParams: Promis
     forecastMonth(supabase, p, monthKey(now, tz)),
   ]);
 
+  // Opening the Diary counts as seeing its updates; requests that need an answer stay unread until answered.
+  if (recent?.some((n) => !n.read_at))
+    await supabase.from("notifications").update({ read_at: new Date().toISOString() }).eq("user_id", p.id).is("read_at", null).neq("kind", "reschedule_request");
+
   const needsAnswer = visits.filter((v) => v.status === "awaiting" && !v.client_response);
   // What skipping or moving each visit would cost right now under its agreement.
   const costs = new Map(
@@ -101,7 +105,7 @@ export default async function DiaryPage({ searchParams }: { searchParams: Promis
             <p className="text-xs text-slate">time saved so far</p>
           </div>
           <div className="clay-sm px-5 py-3">
-            <p className="font-display text-3xl font-extrabold">{money(budget ? Number(budget.cap) : forecast.cap, currency)}</p>
+            <p className="font-display text-3xl font-extrabold">{money(budget ? Number(budget.cap) : p.monthly_budget && Number(p.monthly_budget) >= forecast.total ? Number(p.monthly_budget) : forecast.cap, currency)}</p>
             <p className="text-xs text-slate">{budget?.status === "approved" ? "budget approved" : "budget to approve"}</p>
           </div>
         </div>
@@ -297,7 +301,7 @@ export default async function DiaryPage({ searchParams }: { searchParams: Promis
                       monthly={pl.monthly_price}
                       suggested={monthlyPriceFor(pl)}
                       currency={currency}
-                      paypalReady={paypalConfigured()}
+                      paypalReady={paypalConfigured() && Boolean(p.paypal_payment_token)}
                     />
                   )}
                 </Card>

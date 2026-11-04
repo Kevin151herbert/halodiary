@@ -7,7 +7,7 @@ import { btn } from "@/components/ui";
 import { dismissTourAction } from "../start/actions";
 import { setClockAction } from "./actions";
 
-export type TourState = { approved: boolean; paypal: boolean; held: boolean; charged: boolean; asked: boolean; month: string };
+export type TourState = { approved: boolean; paypal: boolean; held: boolean; charged: boolean; asked: boolean; blocked: boolean; month: string };
 
 const BUYER_EMAIL = process.env.NEXT_PUBLIC_SANDBOX_BUYER_EMAIL;
 const BUYER_PASSWORD = process.env.NEXT_PUBLIC_SANDBOX_BUYER_PASSWORD;
@@ -91,9 +91,9 @@ export function TourGuide({ state }: { state: TourState }) {
       ),
     },
     {
-      done: state.asked,
-      title: "Let the AI book something",
-      body: "Ask the assistant for a babysitter. It searches, picks, and asks you to approve before anything is booked or paid. Your AI spending limit is €75 a payment: try a bigger one and watch it refuse.",
+      done: state.asked && state.blocked,
+      title: "Let the AI book, inside your limits",
+      body: `${state.asked ? "Done: the assistant booked after your OK. " : "Ask the assistant for a babysitter: it searches, picks, and asks you to approve before anything is booked. "}${state.blocked ? "And it was stopped by your limit." : "Then try something over your €75-a-payment AI limit and watch it refuse without asking."}`,
       action: (
         <span className="flex flex-wrap gap-2">
           <button className={`${btn.primary} px-4 py-2 text-sm`} onClick={() => askAssistant("Find me a babysitter for Saturday evenings and add it to my diary.")}>
@@ -108,7 +108,7 @@ export function TourGuide({ state }: { state: TourState }) {
     {
       done: providerSeen,
       title: "See the provider's side",
-      body: "Schedule, attendance score, ratings and PayPal payouts for the people you hire.",
+      body: "The same visits from the provider's seat: their schedule, their answers to each check, and the PayPal payouts they receive.",
       action: (
         <Link
           href="/app/provider"
@@ -127,6 +127,21 @@ export function TourGuide({ state }: { state: TourState }) {
   ];
   const doneCount = steps.filter((s) => s.done).length;
   const current = steps.findIndex((s) => !s.done);
+
+  if (current === -1)
+    return (
+      <section aria-labelledby="tour" className="clay-inset mb-6 flex items-center gap-3 px-4 py-3" data-tour>
+        <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sage text-white" aria-hidden>
+          <Check size={15} />
+        </span>
+        <h2 id="tour" className="flex-1 text-sm font-bold">
+          Tour complete: you have seen HaloDiary end to end. Explore freely.
+        </h2>
+        <button onClick={() => start(() => dismissTourAction())} className="rounded-full p-2 hover:bg-white/70" aria-label="Close tour">
+          <X size={16} aria-hidden />
+        </button>
+      </section>
+    );
 
   return (
     <section aria-labelledby="tour" className="clay mb-6 p-4 sm:p-5" data-tour>

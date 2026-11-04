@@ -5,6 +5,8 @@ import { DefaultChatTransport, lastAssistantMessageIsCompleteWithApprovalRespons
 import { Power, RotateCcw, Send, Sparkles, X } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
+import { CADENCES, type CadenceKey } from "@/lib/cadence";
+import { defaultTermsFor } from "@/lib/contract";
 import { toggleAssistantAction } from "@/app/app/actions";
 import { btn } from "../ui";
 
@@ -105,6 +107,25 @@ function ProviderResults({ output }: { output: unknown }) {
   );
 }
 
+/** What approving a new service means: the monthly cost and the agreement the assistant will sign for you. */
+function PlanTerms({ input }: { input: Record<string, unknown> }) {
+  const price = Number(String(input.price_per_visit ?? "").replace(/[^0-9.]/g, "")) || 0;
+  const cadence = CADENCES[String(input.cadence) as CadenceKey];
+  const t = defaultTermsFor(String(input.service_id ?? ""));
+  const monthly = price * (cadence?.perMonth ?? 4.3);
+  const code = String(input.price_per_visit ?? "").match(/[A-Z]{3}/)?.[0] ?? "EUR";
+  const fmtMoney = (n: number) => new Intl.NumberFormat("en-GB", { style: "currency", currency: code, maximumFractionDigits: 0 }).format(n);
+  return (
+    <ul className="mt-2 space-y-1 text-xs text-slate">
+      {price > 0 && <li>About {fmtMoney(monthly)} a month. HaloDiary checked it fits your monthly budget.</li>}
+      <li>
+        Approving signs the standard agreement for you: free changes up to {t.cancellation_notice_hours}h before, {t.late_cancellation_fee_pct}% fee for later
+        ones, {t.termination_notice_days} days&apos; notice to end. You can change it later under Agreements.
+      </li>
+    </ul>
+  );
+}
+
 function ToolView({ part, onApprove }: { part: ToolPart; onApprove: (id: string, approved: boolean) => void }) {
   const name = part.type.replace(/^tool-/, "");
   if (part.state === "approval-requested" && part.approval && !part.approval.isAutomatic) {
@@ -112,6 +133,7 @@ function ToolView({ part, onApprove }: { part: ToolPart; onApprove: (id: string,
       <div className="clay-sm p-4 ring-2 ring-halo/70">
         <p className="text-xs font-bold text-slate">Needs your OK</p>
         <p className="mt-1 font-bold">{approvalText(name, part.input)}</p>
+        {name === "add_recurring_service" && <PlanTerms input={part.input as Record<string, unknown>} />}
         <div className="mt-3 flex gap-2">
           <button className={btn.primary} onClick={() => onApprove(part.approval!.id, true)}>
             {APPROVE_LABEL[name] ?? "Approve"}
@@ -129,7 +151,13 @@ function ToolView({ part, onApprove }: { part: ToolPart; onApprove: (id: string,
   if (part.state === "output-error") return <p className="text-sm text-rose">Couldn&apos;t finish: {part.errorText}</p>;
   if (part.state === "output-available") {
     const out = part.output as { error?: string } | undefined;
-    if (out && typeof out === "object" && "error" in out && out.error) return <p className="text-sm text-rose">Couldn&apos;t finish: {out.error}</p>;
+    if (out && typeof out === "object" && "error" in out && out.error)
+      return (
+        <p className="clay-inset px-3 py-2 text-sm">
+          <span className="font-bold text-rose">Stopped by your limits. </span>
+          {out.error}
+        </p>
+      );
     if (name === "search_providers") return <ProviderResults output={part.output} />;
     if (name in APPROVE_LABEL) return <p className="text-sm font-bold text-sage">Done: {approvalText(name, part.input)}</p>;
     return null;

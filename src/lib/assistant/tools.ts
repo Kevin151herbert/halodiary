@@ -14,7 +14,7 @@ import { TERM_OPTIONS } from "../contract";
 import { forecastMonth, monthKey, nowFor, spentInMonth } from "../engine";
 import type { Profile } from "../supabase/server";
 import { fmtShort, monthLabel } from "../time";
-import { guardPayment, type AgentOrigin } from "../agent-guard";
+import { blockReason, guardPayment, type AgentOrigin } from "../agent-guard";
 
 const cadenceEnum = z.enum(CADENCE_KEYS as [string, ...string[]]);
 const localTime = z
@@ -316,16 +316,21 @@ export function buildTools(supabase: SupabaseClient, profile: Profile, origin: A
   guarded(clientActions);
   guarded(providerActions);
 
+  /** Whether an acting tool may even be offered for approval: a call that would be refused runs straight to its refusal. */
+  const precheck = async (name: string, input: Record<string, unknown>) => Boolean(await blockReason(supabase, profile, origin, name, input));
+
   if (profile.role === "provider") {
     // A provider's own visits are in the context snapshot; client data stays out of reach.
     return {
       tools: { list_services: readTools.list_services, ...providerActions, sign_agreement: clientActions.sign_agreement },
       approval: ["answer_as_provider", "sign_agreement"],
+      precheck,
     };
   }
   return {
     tools: { ...readTools, ...clientActions, ...providerActions },
     approval: [...Object.keys(clientActions), ...Object.keys(providerActions)],
+    precheck,
   };
 }
 

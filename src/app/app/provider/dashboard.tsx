@@ -81,11 +81,15 @@ export async function ProviderDashboard({ providerId }: { providerId: string }) 
 
       <section className="grid grid-cols-2 gap-4 lg:grid-cols-4" aria-label="Your numbers">
         <div className="clay flex flex-col items-center p-5 text-center">
-          <RingGauge value={attendance.total ? attendance.rate : 1} size={96} label={`Attendance ${Math.round(attendance.rate * 100)}%`} />
+          {attendance.total ? (
+            <RingGauge value={attendance.rate} size={96} label={`Attendance ${Math.round(attendance.rate * 100)}%`} />
+          ) : (
+            <span className="flex h-24 w-24 items-center justify-center rounded-full border-4 border-dashed border-mist font-display text-lg font-bold text-slate">New</span>
+          )}
           <p className="mt-2 text-sm font-bold">Attendance</p>
           <p className="text-xs text-slate">{attendance.total ? `${attendance.total} booked visits` : "No visits yet"}</p>
         </div>
-        <Tile icon={<Star size={18} />} tone="halo" big={Number(p.rating).toFixed(1)} label="Rating" sub={`${p.review_count} reviews`} />
+        <Tile icon={<Star size={18} />} tone="halo" big={p.review_count ? Number(p.rating).toFixed(1) : "New"} label="Rating" sub={p.review_count ? `${p.review_count} reviews` : "Ratings appear after visits"} />
         <Tile icon={<CalendarHeart size={18} />} tone="ink" big={String(thisWeek.length)} label="Visits this week" sub={`${visits.length} in the next 14 days`} />
         <Tile icon={<Wallet size={18} />} tone="sage" big={money(earned, me.currency)} label="Paid out" sub="through PayPal" />
       </section>

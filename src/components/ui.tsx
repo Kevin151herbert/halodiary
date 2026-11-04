@@ -188,6 +188,7 @@ export function StatusPill({ status }: { status: string }) {
   const map: Record<string, [string, string]> = {
     scheduled: ["On the diary", "bg-white/80 text-slate"],
     awaiting: ["Needs your answer", "bg-rose-soft text-rose"],
+    awaiting_other: ["Waiting for the client", "bg-halo-soft text-ink"],
     confirmed: ["Confirmed, payment held", "bg-sage-soft text-sage"],
     completed: ["Done and paid", "bg-sage text-white"],
     skipped: ["Skipped", "bg-white/80 text-slate"],

@@ -21,19 +21,24 @@ type Step = { key: string; label: string; line: Line | null };
 export async function MoneyTrail({ supabase, profile }: { supabase: SupabaseClient; profile: Profile }) {
   const { data } = await supabase
     .from("ledger_entries")
-    .select("kind, amount, mode, paypal_ref, paypal_confirmed_at, created_at, visit_id, visits(scheduled_at, services(name), providers(display_name))")
+    .select("kind, amount, mode, paypal_ref, paypal_confirmed_at, created_at, visit_id, note, visits(scheduled_at, status, services(name), providers(display_name))")
     .eq("client_id", profile.id)
-    .in("kind", ["hold", "capture", "void", "payout", "refund", "fee"])
+    .in("kind", ["hold", "capture", "void", "payout", "refund"])
     .not("visit_id", "is", null)
     .order("created_at", { ascending: false })
     .limit(40);
-  const lines = (data ?? []) as unknown as Line[];
+  // Only the visit's own money: extras paid in chat and their payouts have their own lines in the ledger.
+  const lines = ((data ?? []) as unknown as (Line & { note: string | null })[]).filter(
+    (l) => !(l.kind === "payout" && /^(Extra paid in chat|Provider share of an invoice)/.test(l.note ?? "")),
+  );
   if (!lines.length) return null;
 
   // Group by visit, newest activity first, four visits at most.
   const byVisit = new Map<string, Line[]>();
   for (const l of lines) byVisit.set(l.visit_id!, [...(byVisit.get(l.visit_id!) ?? []), l]);
-  const visits = [...byVisit.entries()].slice(0, 4);
+  // A visit's trail starts with its hold; visits covered by a subscription have no hold and show in the ledger instead.
+  const visits = [...byVisit.entries()].filter(([, ls]) => ls.some((l) => l.kind === "hold")).slice(0, 4);
+  if (!visits.length) return null;
   const money = (n: number) => new Intl.NumberFormat("en-GB", { style: "currency", currency: profile.currency }).format(n);
   let waiting = false;
 

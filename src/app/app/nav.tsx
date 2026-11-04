@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarHeart, CircleUser, Compass, FileSignature, History, MessagesSquare, Settings, Store, Wallet } from "lucide-react";
+import { CalendarHeart, CircleUser, Compass, FileSignature, History, MessagesSquare, MoreHorizontal, Settings, Store, Wallet } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -31,9 +31,13 @@ export function Nav({ role, unread, chats = 0, compact = false }: { role: "clien
     href === "/app" || href === "/app/provider" ? path === href : path === href || path.startsWith(`${href}/`);
 
   if (compact) {
+    // Four destinations and a More sheet, so every page (Activity, Settings, Provider view) is reachable on a phone.
+    const main = items.slice(0, 4);
+    const more = items.slice(4);
+    const moreActive = more.some((i) => active(i.href));
     return (
-      <nav className="flex justify-around px-1.5 py-1.5" aria-label="Main">
-        {items.slice(0, 5).map(({ href, label, icon: Icon, badge }) => (
+      <nav className="relative flex justify-around px-1.5 py-1.5" aria-label="Main">
+        {main.map(({ href, label, icon: Icon, badge }) => (
           <Link
             key={href}
             href={href}
@@ -47,6 +51,30 @@ export function Nav({ role, unread, chats = 0, compact = false }: { role: "clien
             {!!badge && <span className="absolute right-1 top-0 h-2 w-2 rounded-full bg-rose" aria-label={`${badge} unread`} />}
           </Link>
         ))}
+        <details className="group">
+          <summary
+            className={`flex cursor-pointer list-none flex-col items-center gap-0.5 rounded-2xl px-2.5 py-1.5 text-[11px] font-bold transition [&::-webkit-details-marker]:hidden ${
+              moreActive ? "clay-btn-ink" : "text-slate"
+            }`}
+          >
+            <MoreHorizontal size={20} aria-hidden />
+            More
+          </summary>
+          <div className="clay absolute bottom-full right-1 mb-2 flex w-52 flex-col gap-1 p-2">
+            {more.map(({ href, label, icon: Icon }) => (
+              <Link
+                key={href}
+                href={href}
+                aria-current={active(href) ? "page" : undefined}
+                onClick={(e) => (e.currentTarget.closest("details") as HTMLDetailsElement | null)?.removeAttribute("open")}
+                className={`flex items-center gap-3 rounded-2xl px-3 py-2.5 text-sm font-bold ${active(href) ? "clay-btn-ink" : "text-ink hover:bg-white/70"}`}
+              >
+                <Icon size={18} aria-hidden />
+                {label}
+              </Link>
+            ))}
+          </div>
+        </details>
       </nav>
     );
   }

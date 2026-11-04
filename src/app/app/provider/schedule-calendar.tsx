@@ -203,7 +203,7 @@ export function ScheduleCalendar({
                         </span>
                         <span className="hidden shrink-0 text-slate sm:inline">{money(v.earn)}</span>
                         <span className="hidden sm:inline-flex">
-                          <StatusPill status={v.status} />
+                          <StatusPill status={v.status === "awaiting" && v.provider_response === "proceed" ? "awaiting_other" : v.status} />
                         </span>
                         <span
                           className={`h-2.5 w-2.5 shrink-0 rounded-full sm:hidden ${
@@ -217,7 +217,7 @@ export function ScheduleCalendar({
                         <div className="px-3 pb-3">
                           <div className="flex flex-wrap items-center gap-2 text-xs text-slate">
                             <span className="sm:hidden">
-                              <StatusPill status={v.status} />
+                              <StatusPill status={v.status === "awaiting" && v.provider_response === "proceed" ? "awaiting_other" : v.status} />
                             </span>
                             You receive {money(v.earn)} after the visit, paid out through PayPal.
                           </div>

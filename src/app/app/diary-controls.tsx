@@ -230,7 +230,7 @@ export function BillingControls({
           })
         }
       >
-        {pending ? "Opening PayPal…" : `Pay ${money(suggested)}/mo flat with PayPal (5% off)`}
+        {pending ? "Opening PayPal…" : `Pay ${money(suggested)}/mo flat with PayPal (5% under an average month)`}
       </button>
       {status === "APPROVAL_PENDING" && <span className="ml-2 text-slate">Waiting for your PayPal approval.</span>}
       {error && <p className="mt-1 text-rose">{error}</p>}

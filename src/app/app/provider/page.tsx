@@ -132,7 +132,7 @@ export default async function ProviderView({ searchParams }: { searchParams: Pro
                     for {me.role === "client" ? "you" : "a client"}, you receive {money(Number(v.price) * (1 - COMMISSION), me.currency)}
                   </span>
                 </span>
-                <StatusPill status={v.status} />
+                <StatusPill status={v.status === "awaiting" && v.provider_response === "proceed" ? "awaiting_other" : v.status} />
               </div>
               <ProviderVisitActions
                 visitId={v.id}

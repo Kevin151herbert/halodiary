@@ -143,7 +143,7 @@ export function WeekPlanner({
     };
     // The calendar is built once; data changes flow in below.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tz]);
+  }, [tz, nowIso.slice(0, 10)]);
 
   useEffect(() => {
     if (cal.current) cal.current.eventStore.data = toEvents(visits, nowMs);

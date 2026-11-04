@@ -12,6 +12,9 @@ export default async function MessagesPage() {
   const asProvider = p.role === "provider";
   const { data } = await supabase.from("conversations").select(CONVERSATION_SELECT).order("last_message_at", { ascending: false });
   const convs = (data ?? []) as Conversation[];
+  // Providers cannot read client profiles; this returns just the names of their own clients.
+  const { data: names } = asProvider ? await supabase.rpc("my_client_names") : { data: null };
+  const nameOf = new Map(((names ?? []) as { client_id: string; name: string }[]).map((n) => [n.client_id, n.name]));
 
   // Clients can start a thread with any provider they have booked.
   let booked: { id: string; name: string; hue: number }[] = [];
@@ -45,7 +48,7 @@ export default async function MessagesPage() {
         <ul className="space-y-3">
           {convs.map((c) => {
             const unread = c.last_message_at > (asProvider ? c.provider_read_at : c.client_read_at);
-            const name = asProvider ? "Client" : (c.providers?.display_name ?? "");
+            const name = asProvider ? (nameOf.get(c.client_id) ?? "Client") : (c.providers?.display_name ?? "");
             return (
               <li key={c.id}>
                 <Link href={`/app/messages/${c.id}`} className="clay-sm flex items-center gap-4 p-4">

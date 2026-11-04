@@ -173,8 +173,21 @@ export async function spentInMonth(supabase: SupabaseClient, profile: Profile, m
     .eq("kind", "fee")
     .gte("visits.scheduled_at", start.toISOString())
     .lt("visits.scheduled_at", end.toISOString());
+  // Extras paid in chat count against the month too, so the budget shows everything that left the client's account.
+  const { data: extras } = await supabase
+    .from("ledger_entries")
+    .select("amount")
+    .eq("client_id", profile.id)
+    .eq("kind", "extra")
+    .gte("created_at", start.toISOString())
+    .lt("created_at", end.toISOString());
   const perVisit = (data ?? []).filter((v) => (v.plans as unknown as { billing?: string } | null)?.billing !== "subscription");
-  return perVisit.reduce((s, v) => s + Number(v.price), 0) + (fees ?? []).reduce((s, f) => s + Number(f.amount), 0) + subscribed;
+  return (
+    perVisit.reduce((s, v) => s + Number(v.price), 0) +
+    (fees ?? []).reduce((s, f) => s + Number(f.amount), 0) +
+    (extras ?? []).reduce((s, e) => s + Number(e.amount), 0) +
+    subscribed
+  );
 }
 
 export async function forecastMonth(supabase: SupabaseClient, profile: Profile, month: string) {

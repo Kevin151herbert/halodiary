@@ -31,7 +31,9 @@ export default async function ThreadPage({ params }: { params: Promise<{ id: str
       : { data: null };
 
   const reportable = as === "client" ? await reportableVisits(supabase, p, conv.provider_id) : [];
-  const name = as === "client" ? (conv.providers?.display_name ?? "Provider") : "Your client";
+  const clientName =
+    as === "provider" ? (((await supabase.rpc("my_client_names")).data ?? []) as { client_id: string; name: string }[]).find((n) => n.client_id === conv.client_id)?.name : null;
+  const name = as === "client" ? (conv.providers?.display_name ?? "Provider") : (clientName ?? "Your client");
   const next = visits?.[0];
 
   return (
