@@ -6,6 +6,7 @@ import { fmt, monthLabel } from "@/lib/time";
 import { SimulatedApprove } from "./simulated-approve";
 import { PayPalV6Button } from "./paypal-v6-button";
 import { StatementButton } from "./statement-button";
+import { MoneyTrail } from "../money-trail";
 import { LedgerGrid } from "@/components/ledger-grid-lazy";
 
 const LABEL: Record<string, string> = {
@@ -235,6 +236,8 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
           )}
         </Card>
       </section>
+
+      <MoneyTrail supabase={supabase} profile={p} />
 
       <section>
         <h2 className="text-xl font-bold">Payments ledger</h2>

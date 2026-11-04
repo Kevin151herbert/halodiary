@@ -7,6 +7,7 @@ import { forecastMonth, MINUTES_SAVED_PER_VISIT, monthKey, nowFor } from "@/lib/
 import { getSession } from "@/lib/supabase/server";
 import { addDays, dayKey as dayKeyZ, fmt, fmtDay as fmtDayZ, fmtTime as fmtTimeZ, localInputValue, zonedTime, zParts } from "@/lib/time";
 import { openChatAction } from "./actions";
+import { MoneyTrail } from "./money-trail";
 import { BillingControls, DemoClock, PlanControls, ProposalAnswer, VisitAnswer } from "./diary-controls";
 import { paypalConfigured } from "@/lib/paypal";
 import { monthlyPriceFor } from "@/lib/subscriptions";
@@ -178,6 +179,8 @@ export default async function DiaryPage({ searchParams }: { searchParams: Promis
           </ul>
         </section>
       )}
+
+      <MoneyTrail supabase={supabase} profile={p} />
 
       <section aria-labelledby="upcoming" className="clay p-5 sm:p-6">
         <h2 id="upcoming" className="text-xl font-bold">
