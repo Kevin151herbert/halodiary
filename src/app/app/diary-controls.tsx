@@ -142,24 +142,25 @@ export function PlanControls({ planId, status }: { planId: string; status: strin
   );
 }
 
-/** Lets judges jump ahead in time to see day-before checks, holds and payouts happen. */
+/** Lets judges jump ahead in time to see day-before checks, holds and payouts happen. Real time keeps doing the same, just slower. */
 export function DemoClock({ offsetHours }: { offsetHours: number }) {
   const [pending, start] = useTransition();
   return (
     <section aria-labelledby="clock" className="clay-inset p-5 sm:p-6">
       <h2 id="clock" className="font-bold">
-        Demo clock
+        Skip ahead in time
       </h2>
       <p className="mt-1 text-sm text-slate">
-        Move time forward to watch the day-before checks go out, payments get held, and providers get paid.
-        {offsetHours !== 0 && ` Currently ${offsetHours} hours ahead.`}
+        HaloDiary works on its own as days pass. Skip ahead to see it: tomorrow&apos;s visits get their day-before check, confirmed visits are held on
+        PayPal, and finished ones are charged and paid out to the provider.
+        {offsetHours !== 0 && ` You are ${offsetHours >= 24 ? `${Math.round(offsetHours / 24)} day${Math.round(offsetHours / 24) === 1 ? "" : "s"}` : `${offsetHours} hours`} ahead.`}
       </p>
       <div className="mt-3 flex flex-wrap gap-2">
+        <button className={btn.primary} disabled={pending} onClick={() => start(() => setClockAction(24))}>
+          {pending ? "Moving time…" : "Skip to tomorrow"}
+        </button>
         <button className={btn.ghost} disabled={pending} onClick={() => start(() => setClockAction(12))}>
           +12 hours
-        </button>
-        <button className={btn.ghost} disabled={pending} onClick={() => start(() => setClockAction(24))}>
-          +1 day
         </button>
         <button className={btn.ghost} disabled={pending} onClick={() => start(() => setClockAction(72))}>
           +3 days

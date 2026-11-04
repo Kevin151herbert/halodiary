@@ -123,6 +123,8 @@ export default async function DiaryPage({ searchParams }: { searchParams: Promis
         </ol>
       </section>
 
+      {(plans?.length ?? 0) > 0 && <DemoClock offsetHours={p.clock_offset_hours} />}
+
       {(needsAnswer.length > 0 || (proposals?.length ?? 0) > 0) && (
         <section aria-labelledby="answers">
           <h2 id="answers" className="text-xl font-bold">
@@ -321,7 +323,6 @@ export default async function DiaryPage({ searchParams }: { searchParams: Promis
         </section>
       )}
 
-      <DemoClock offsetHours={p.clock_offset_hours} />
       <p className="text-xs text-slate">Time saved is estimated at {MINUTES_SAVED_PER_VISIT} minutes per visit handled for you.</p>
     </div>
   );

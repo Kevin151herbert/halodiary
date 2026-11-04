@@ -17,7 +17,7 @@ export type LedgerRow = {
   party: string;
   amount: number; // signed: money back to the client is negative
   ref: string;
-  mode: "Sandbox" | "Simulated";
+  mode: "Sandbox" | "Simulated" | "Simulated: PayPal unavailable";
   confirmed: string; // "PayPal ✓", "Waiting" or ""
   note: string;
 };
@@ -66,7 +66,15 @@ export function LedgerGrid({ rows, currency, fileName, partyLabel = "Provider" }
       { field: "service", headerName: "Visit", filter: true, width: 130 },
       { field: "party", headerName: partyLabel, filter: true, width: 120 },
       { field: "confirmed", headerName: "Webhook", width: 105, cellStyle: (p) => (p.value === "PayPal ✓" ? { color: "#2e8a74", fontWeight: "700" } : { color: "#5d6480", fontWeight: "400" }) },
-      { field: "mode", headerName: "Mode", filter: true, width: 105 },
+      {
+        field: "mode",
+        headerName: "Mode",
+        filter: true,
+        width: 130,
+        tooltipValueGetter: (p) => (p.value === "Simulated: PayPal unavailable" ? "PayPal could not be reached, so HaloDiary recorded this step as simulated. The reason is in Activity." : undefined),
+        cellStyle: (p) => (p.value === "Simulated: PayPal unavailable" ? { color: "#a3304b", fontWeight: "700" } : { color: "inherit", fontWeight: "400" }),
+        valueFormatter: (p) => (p.value === "Simulated: PayPal unavailable" ? "Fallback" : p.value),
+      },
       { field: "ref", headerName: "PayPal reference", width: 200, cellStyle: { fontFamily: "ui-monospace, monospace", fontSize: "12px" } },
       { field: "note", headerName: "Note", flex: 1, minWidth: 160 },
     ],

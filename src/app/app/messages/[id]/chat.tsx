@@ -154,7 +154,7 @@ export function Chat({ conversationId, initial, as, otherName, isDemo, currency,
           </li>
         )}
         {messages.map((m) => (
-          <Bubble key={m.id} m={m} as={as} first={first} money={money} tz={tz} paysWithPayPal={paysWithPayPal} onError={setError} onMerge={merge} />
+          <Bubble key={m.id} m={m} as={as} first={first} money={money} tz={tz} paysWithPayPal={paysWithPayPal} onError={setError} onMerge={merge} aiVoice={isDemo && as === "client"} />
         ))}
         {typing && (
           <li className="flex">
@@ -319,7 +319,9 @@ function Bubble({
   paysWithPayPal,
   onError,
   onMerge,
+  aiVoice = false,
 }: {
+  aiVoice?: boolean;
   m: Message;
   as: "client" | "provider";
   first: string;
@@ -495,7 +497,10 @@ function Bubble({
     <li className={`flex ${mine ? "justify-end" : ""}`}>
       <div className={`max-w-[85%] px-4 py-2.5 ${mine ? "clay-btn-ink rounded-3xl rounded-br-lg" : "clay-sm rounded-3xl rounded-bl-lg"}`}>
         <p className="whitespace-pre-wrap">{m.body}</p>
-        <p className={`mt-1 text-right text-[11px] ${mine ? "text-white/70" : "text-slate"}`}>{time}</p>
+        <p className={`mt-1 text-right text-[11px] ${mine ? "text-white/70" : "text-slate"}`}>
+          {aiVoice && !mine && m.sender === "provider" ? "AI reply for a demo provider · " : ""}
+          {time}
+        </p>
       </div>
     </li>
   );

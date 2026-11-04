@@ -40,7 +40,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             <p>{profile.city ?? "Location set"}</p>
             {profile.clock_offset_hours !== 0 && (
               <p className="clay-inset px-3 py-2 font-bold text-ink">
-                Demo clock: {fmtShort(now, profile.timezone)}
+                Demo time: {fmtShort(now, profile.timezone)}
               </p>
             )}
           </div>

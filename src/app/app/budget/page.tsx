@@ -61,6 +61,9 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
   const pct = cap ? Math.min(100, (used / cap) * 100) : 0;
   const credit = (openCredits ?? []).reduce((s, c) => s + Number(c.amount), 0);
   const realPayPal = paypalConfigured();
+  // The first line that went through PayPal: simulated lines after it mean PayPal failed and HaloDiary carried on.
+  const paypalSince =
+    ((ledger ?? []) as unknown as LedgerRow[]).filter((e) => e.mode === "paypal_sandbox").map((e) => e.created_at).sort().at(0) ?? "9999-12-31";
 
   return (
     <div className="space-y-10">
@@ -210,7 +213,18 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
                   </form>
                   )
                 )}
-                <SimulatedApprove month={month} cap={forecast.cap} disabled={!forecast.lines.length} primary={!realPayPal} />
+                {realPayPal ? (
+                  // PayPal is the product; simulation is a fallback, not a choice next to it.
+                  <details className="text-center text-xs text-slate">
+                    <summary className="cursor-pointer font-bold underline decoration-mist decoration-2 underline-offset-2">Can&apos;t use PayPal right now?</summary>
+                    <p className="mt-2">Approve with a simulated payment instead. Every step still runs, labelled &quot;Simulated&quot; in the ledger.</p>
+                    <div className="mt-2">
+                      <SimulatedApprove month={month} cap={forecast.cap} disabled={!forecast.lines.length} primary={false} />
+                    </div>
+                  </details>
+                ) : (
+                  <SimulatedApprove month={month} cap={forecast.cap} disabled={!forecast.lines.length} primary />
+                )}
               </div>
               <p className="mt-auto pt-6 text-xs text-slate">
                 {realPayPal
@@ -241,7 +255,8 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
               party: e.providers?.display_name ?? "",
               amount: ["credit", "refund", "void"].includes(e.kind) ? -Number(e.amount) : Number(e.amount),
               ref: e.paypal_ref ?? "",
-              mode: e.mode === "paypal_sandbox" ? "Sandbox" : "Simulated",
+              // With a saved PayPal account every money line should be PayPal; a simulated one means PayPal failed and the app carried on.
+              mode: e.mode === "paypal_sandbox" ? "Sandbox" : p.paypal_payment_token && e.kind !== "credit" && new Date(e.created_at) > new Date(paypalSince) ? "Simulated: PayPal unavailable" : "Simulated",
               confirmed: e.paypal_confirmed_at ? "PayPal ✓" : e.mode === "paypal_sandbox" ? "Waiting" : "",
               note: e.note ?? "",
             }))}

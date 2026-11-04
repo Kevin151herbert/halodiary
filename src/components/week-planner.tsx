@@ -48,7 +48,8 @@ function toEvents(visits: PlannerVisit[], nowMs: number) {
     .filter((v) => !["skipped", "cancelled"].includes(v.status))
     .map((v) => ({
       id: v.id,
-      name: v.title,
+      // The other person's name rides in the title so every view (week, day, agenda) shows it.
+      name: `${v.title} · ${v.who}`,
       startDate: v.scheduled_at,
       duration: v.minutes / 60,
       durationUnit: "h",
@@ -106,7 +107,7 @@ export function WeekPlanner({
           week: { dayStartTime: 7, dayEndTime: 22, hourHeight: 48 },
           month: null,
           year: null,
-          agenda: true,
+          agenda: { descriptionRenderer: () => "Next visits" },
         },
         features: {
           eventEdit: false,
@@ -115,11 +116,9 @@ export function WeekPlanner({
           drag: { creatable: false, resizable: false },
           eventTooltip: {
             renderer: ({ eventRecord }: { eventRecord: { name: string; data: { who: string; status: string } } }) =>
-              `<b>${StringHelper.encodeHtml(eventRecord.name)}</b><br>${StringHelper.encodeHtml(eventRecord.data.who)} · ${StringHelper.encodeHtml(eventRecord.data.status)}`,
+              `<b>${StringHelper.encodeHtml(eventRecord.name)}</b><br>${StringHelper.encodeHtml(eventRecord.data.status)}`,
           },
         },
-        eventRenderer: ({ eventRecord }: { eventRecord: { name: string; data: { who: string } } }) =>
-          `${StringHelper.encodeHtml(eventRecord.name)}<span class="hd-who"> · ${StringHelper.encodeHtml(eventRecord.data.who)}</span>`,
         events: toEvents([...byId.current.values()], nowMs),
         listeners: {
           beforeDragMoveEnd: ({ eventRecord, newStartDate }: { eventRecord: { id: string }; newStartDate: Date }) => {
