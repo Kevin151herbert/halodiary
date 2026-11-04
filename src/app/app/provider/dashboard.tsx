@@ -55,7 +55,9 @@ export async function ProviderDashboard({ providerId }: { providerId: string }) 
   const pendingPlans = new Set((pending ?? []).map((c) => (c as { plan_id: string }).plan_id));
   const all = ((visitsRaw ?? []) as VisitRow[]).filter((v) => !v.plan_id || !pendingPlans.has(v.plan_id));
   const visits = all.filter((v) => new Date(v.scheduled_at).getTime() >= now.getTime() - 6 * 3_600_000 && new Date(v.scheduled_at).getTime() <= now.getTime() + 14 * 86_400_000);
-  const earned = (payouts ?? []).filter((e) => e.kind === "payout").reduce((s, e) => s + Number(e.amount), 0);
+  const paid = (payouts ?? []).filter((e) => e.kind === "payout");
+  const earned = paid.reduce((s, e) => s + Number(e.amount), 0);
+  const allSimulated = paid.length > 0 && paid.every((e) => e.mode !== "paypal_sandbox");
   const weekEnd = now.getTime() + 7 * 86_400_000;
   const thisWeek = visits.filter((v) => new Date(v.scheduled_at).getTime() <= weekEnd);
   const comp = profileCompleteness({ ...p, website: p.website ?? null, socials: p.socials ?? {}, team: p.team ?? [] });
@@ -93,7 +95,7 @@ export async function ProviderDashboard({ providerId }: { providerId: string }) 
         </div>
         <Tile icon={<Star size={18} />} tone="halo" big={p.review_count ? Number(p.rating).toFixed(1) : "New"} label="Rating" sub={p.review_count ? `${p.review_count} reviews` : "Ratings appear after visits"} />
         <Tile icon={<CalendarHeart size={18} />} tone="ink" big={String(thisWeek.length)} label="Visits this week" sub={`${visits.length} in the next 14 days`} />
-        <Tile icon={<Wallet size={18} />} tone="sage" big={money(earned, me.currency)} label="Paid out" sub="through PayPal" />
+        <Tile icon={<Wallet size={18} />} tone="sage" big={money(earned, me.currency)} label="Paid out" sub={allSimulated ? "simulated PayPal payouts" : "through PayPal"} />
       </section>
 
       {!planCount && (

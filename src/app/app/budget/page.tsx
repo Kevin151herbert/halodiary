@@ -97,7 +97,7 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
           </div>
         </div>
       )}
-      {approved && <p className="clay-sm px-4 py-3 font-bold text-sage">Budget approved{approved === "paypal" ? " with PayPal" : ""}. Visits will now confirm on their own.</p>}
+      {approved && <p className="clay-sm px-4 py-3 font-bold text-sage">Budget approved{approved === "paypal" ? " with PayPal" : ""}. Each visit is held on PayPal once it is confirmed the day before, and charged only after it is done.</p>}
       {paypal_error && (
         <p className="clay-sm px-4 py-3 text-sm text-rose">
           {paypal_error === "cancelled"
@@ -196,8 +196,13 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
               <p className="text-sm text-slate">Approve once for {label}</p>
               <p className="mt-2 font-display text-4xl font-extrabold">{money(forecast.cap, p.currency)}</p>
               <p className="text-sm text-slate">
-                cap, charged per visit{p.monthly_budget && Number(p.monthly_budget) >= raw.total ? " (your monthly budget)" : ""}
+                cap, charged per visit
               </p>
+              {p.monthly_budget && Number(p.monthly_budget) >= raw.total && Number(p.monthly_budget) !== raw.cap && (
+                <p className="mt-1 text-xs text-slate">
+                  This is the household&apos;s monthly budget. Your services need about {money(raw.cap, p.currency)}, so the rest is room for extras and new services.
+                </p>
+              )}
               <div className="mt-6 space-y-3">
                 {realPayPal && (
                   forecast.lines.length ? (

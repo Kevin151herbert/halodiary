@@ -219,7 +219,7 @@ export function ScheduleCalendar({
                             <span className="sm:hidden">
                               <StatusPill status={v.status === "awaiting" && v.provider_response === "proceed" ? "awaiting_other" : v.status} />
                             </span>
-                            You receive {money(v.earn)} after the visit, paid out through PayPal.
+                            You receive {money(v.earn)}, paid out after the visit is done.
                           </div>
                           {actionable ? (
                             <ProviderVisitActions

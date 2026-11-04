@@ -23,7 +23,16 @@ export function TourGuide({ state }: { state: TourState }) {
   const [providerSeen, setProviderSeen] = useState(false);
   const [open, setOpen] = useState(true);
   const [pending, start] = useTransition();
-  const onBudget = usePathname() === "/app/budget";
+  const path = usePathname();
+  const onBudget = path === "/app/budget";
+  // Opening Provider view any way (sidebar or tour button) completes step 5.
+  useEffect(() => {
+    if (!path.startsWith("/app/provider")) return;
+    setProviderSeen(true);
+    try {
+      localStorage.setItem("hd-tour-provider", "1");
+    } catch {}
+  }, [path]);
   useEffect(() => {
     try {
       setProviderSeen(localStorage.getItem("hd-tour-provider") === "1");
@@ -44,7 +53,7 @@ export function TourGuide({ state }: { state: TourState }) {
   const steps = [
     {
       done: state.approved,
-      title: "Approve the month once with PayPal",
+      title: state.approved && !state.paypal ? "Approve the month once (done, simulated)" : "Approve the month once with PayPal",
       body: (
         <>
           On Budget, press the PayPal button and approve. Nothing is charged now; each visit is paid only after it happens.

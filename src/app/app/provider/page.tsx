@@ -67,7 +67,7 @@ export default async function ProviderView({ searchParams }: { searchParams: Pro
     .not("status", "in", "(cancelled)")
     .order("scheduled_at");
   const visits = (data ?? []) as VisitRow[];
-  const { data: payouts } = await supabase.from("ledger_entries").select("amount").eq("provider_id", providerId).eq("kind", "payout");
+  const { data: payouts } = await supabase.from("ledger_entries").select("amount, mode").eq("provider_id", providerId).eq("kind", "payout");
   const earned = (payouts ?? []).reduce((s, e) => s + Number(e.amount), 0);
   const upcoming = visits.filter((v) => ["scheduled", "awaiting", "confirmed"].includes(v.status));
   const unsigned: { id: string; version: number; plans: unknown }[] = [];
@@ -85,7 +85,7 @@ export default async function ProviderView({ searchParams }: { searchParams: Pro
           <div>
             <h1 className="text-3xl font-extrabold">{providerName}</h1>
             <p className="text-slate">
-              {upcoming.length} upcoming {upcoming.length === 1 ? "visit" : "visits"}, {money(earned, me.currency)} paid out through PayPal
+              {upcoming.length} upcoming {upcoming.length === 1 ? "visit" : "visits"}, {money(earned, me.currency)} paid out{(payouts ?? []).some((e) => e.mode === "paypal_sandbox") ? " through PayPal" : " (simulated PayPal)"}
             </p>
           </div>
         </div>
@@ -139,6 +139,7 @@ export default async function ProviderView({ searchParams }: { searchParams: Pro
                 status={v.status}
                 suggested={localInputValue(new Date(new Date(v.scheduled_at).getTime() + 86_400_000), me.timezone)}
                 answered={v.provider_response}
+                autoAccepted={v.moved_by === "client" && Boolean(v.providers?.is_demo)}
               />
             </Card>
           </li>

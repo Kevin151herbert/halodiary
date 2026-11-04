@@ -9,11 +9,14 @@ export function ProviderVisitActions({
   status,
   suggested,
   answered,
+  autoAccepted = false,
 }: {
   visitId: string;
   status: string;
   suggested: string;
   answered: string | null;
+  /** A demo provider took the client's new time without being asked. */
+  autoAccepted?: boolean;
 }) {
   const [pending, start] = useTransition();
   const [proposing, setProposing] = useState(false);
@@ -102,7 +105,12 @@ export function ProviderVisitActions({
           <button className={btn.quiet} disabled={pending} onClick={() => setCancelling(true)}>
             Cancel visit
           </button>
-          {answered === "proceed" && <span className="text-sm text-sage">You confirmed this visit.</span>}
+          {answered === "proceed" &&
+            (autoAccepted ? (
+              <span className="text-sm text-slate">Moved by the client. Demo providers accept new times automatically; a real provider confirms first.</span>
+            ) : (
+              <span className="text-sm text-sage">You confirmed this visit.</span>
+            ))}
         </>
       )}
       {msg && <span className="text-sm text-slate">{msg}</span>}

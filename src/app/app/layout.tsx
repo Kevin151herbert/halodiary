@@ -75,7 +75,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               <span className="clay-inset px-3 py-1 text-xs font-bold text-ink">Demo time: {fmtShort(now, profile.timezone)}</span>
             )}
           </header>
-          <main className="mx-auto w-full max-w-5xl flex-1 px-5 pb-28 pt-6 sm:px-8 md:pb-12 md:pt-10">
+          <main className="mx-auto w-full max-w-5xl flex-1 px-5 pb-28 pt-6 sm:px-8 md:pb-24 md:pt-10">
             {tour && <TourGuide state={tour} />}
             {children}
           </main>

@@ -37,12 +37,16 @@ export default async function DiaryPage({ searchParams }: { searchParams: Promis
       .order("created_at"),
     supabase.from("visits").select("id", { count: "exact", head: true }).eq("client_id", p.id).in("status", ["confirmed", "completed", "skipped"]),
     supabase.from("notifications").select("*").eq("user_id", p.id).eq("kind", "reschedule_request").is("read_at", null),
-    supabase.from("notifications").select("*").eq("user_id", p.id).neq("kind", "reschedule_request").order("created_at", { ascending: false }).limit(4),
+    supabase.from("notifications").select("*, visits(status)").eq("user_id", p.id).neq("kind", "reschedule_request").order("created_at", { ascending: false }).limit(6),
     supabase.from("budgets").select("*").eq("client_id", p.id).eq("month", monthKey(now, tz)).maybeSingle(),
     forecastMonth(supabase, p, monthKey(now, tz)),
   ]);
 
   // Opening the Diary counts as seeing its updates; requests that need an answer stay unread until answered.
+  // A day-before check that was answered, moved or skipped since is no longer news.
+  const updates = (recent ?? [])
+    .filter((n) => !(n.kind === "day_before_check" && (n as { visits?: { status: string } | null }).visits?.status !== "awaiting"))
+    .slice(0, 4);
   if (recent?.some((n) => !n.read_at))
     await supabase.from("notifications").update({ read_at: new Date().toISOString() }).eq("user_id", p.id).is("read_at", null).neq("kind", "reschedule_request");
 
@@ -130,7 +134,7 @@ export default async function DiaryPage({ searchParams }: { searchParams: Promis
                     <span className="font-display text-base font-bold">{fmt(d, tz, { day: "numeric" })}</span>
                   </Halo>
                 </a>
-                <span className="text-xs text-slate">{live.length ? `${live.length} visit${live.length > 1 ? "s" : ""}` : "Free"}</span>
+                <span className="text-xs text-slate">{live.length ? `${live.length} visit${live.length > 1 ? "s" : ""}` : i === 0 ? "Nothing left" : "Free"}</span>
               </li>
             );
           })}
@@ -197,7 +201,7 @@ export default async function DiaryPage({ searchParams }: { searchParams: Promis
 
       <section aria-labelledby="upcoming" className="clay p-5 sm:p-6">
         <h2 id="upcoming" className="text-xl font-bold">
-          Next two weeks
+          Your planner
         </h2>
         <p className="mb-4 text-sm text-slate">Drag a visit to move it. You see any fee before it changes.</p>
         <WeekPlanner
@@ -320,13 +324,13 @@ export default async function DiaryPage({ searchParams }: { searchParams: Promis
         </Link>
       </section>
 
-      {!!recent?.length && (
+      {!!updates.length && (
         <section aria-labelledby="recent">
           <h2 id="recent" className="text-xl font-bold">
             Latest updates
           </h2>
           <ul className="clay mt-3 space-y-3 p-5 text-sm">
-            {recent.map((n) => (
+            {updates.map((n) => (
               <li key={n.id} className="flex gap-3">
                 <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${n.read_at ? "bg-[#d5dae3]" : "fill-halo"}`} aria-hidden />
                 <span>

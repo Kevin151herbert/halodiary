@@ -372,15 +372,19 @@ export async function completeVisit(supabase: SupabaseClient, profile: Profile, 
   let payoutId = `SIM-PAYOUT-${v.id.slice(0, 8).toUpperCase()}`;
   const mode = (v.payment_mode as "paypal_sandbox" | "simulated") ?? "simulated";
   let payoutMode: "paypal_sandbox" | "simulated" = "simulated";
+  // Only what PayPal actually did is labelled PayPal; a failed or skipped call stays simulated.
+  let captureMode: "paypal_sandbox" | "simulated" = "simulated";
 
   if (mode === "paypal_sandbox" && v.paypal_authorization_id && paypal.paypalConfigured()) {
     try {
       if (charge <= 0) {
         await paypal.voidAuthorization(v.paypal_authorization_id);
         captureId = v.paypal_authorization_id;
+        captureMode = "paypal_sandbox";
       } else {
         // A partial final capture releases the rest of the hold.
         captureId = await paypal.captureAuthorization(v.paypal_authorization_id, charge < price ? { amount: charge, currency: cur } : undefined);
+        captureMode = "paypal_sandbox";
         const po = await paypal.payProvider({ providerEmail: v.providers?.paypal_email, amount: providerShare, currency: cur, note: `${v.services?.name}, ${fmtDay(new Date(v.scheduled_at))}`, fallbackRef: payoutId });
         payoutId = po.ref;
         payoutMode = po.mode;
@@ -395,7 +399,7 @@ export async function completeVisit(supabase: SupabaseClient, profile: Profile, 
   const note = creditUsed ? `${fmtMoney(creditUsed, cur)} agreement credit applied` : "";
   const at = doneAt(profile, v);
   await supabase.from("ledger_entries").insert([
-    { client_id: profile.id, visit_id: v.id, provider_id: v.provider_id, kind: "capture", amount: charge, paypal_ref: captureId, mode, note, created_at: at },
+    { client_id: profile.id, visit_id: v.id, provider_id: v.provider_id, kind: "capture", amount: charge, paypal_ref: captureId, mode: captureMode, note, created_at: at },
     { client_id: profile.id, visit_id: v.id, provider_id: v.provider_id, kind: "payout", amount: providerShare, paypal_ref: payoutId, mode: payoutMode, note, created_at: at },
   ]);
   if (settled.length) await supabase.from("ledger_entries").update({ settled_at: new Date().toISOString() }).in("id", settled);
@@ -404,7 +408,7 @@ export async function completeVisit(supabase: SupabaseClient, profile: Profile, 
     profile.id,
     "payment",
     `${v.services?.name} done, ${fmtMoney(charge, cur)} paid`,
-    `${v.providers?.display_name} received ${fmtMoney(providerShare, cur)} through PayPal.${creditUsed ? ` Your ${fmtMoney(creditUsed, cur)} credit was taken off.` : ""}`,
+    `${v.providers?.display_name} received ${fmtMoney(providerShare, cur)}${payoutMode === "paypal_sandbox" ? " through PayPal" : " (simulated payout)"}.${creditUsed ? ` Your ${fmtMoney(creditUsed, cur)} credit was taken off.` : ""}`,
     v.id,
     at,
   );
@@ -412,8 +416,10 @@ export async function completeVisit(supabase: SupabaseClient, profile: Profile, 
     supabase,
     profile.id,
     actor,
-    `Completed ${v.services?.name}; captured and paid ${v.providers?.display_name}`,
-    { visit: v.id, mode, credit: creditUsed },
+    captureMode === "paypal_sandbox"
+      ? `Completed ${v.services?.name}; charged on PayPal and paid ${v.providers?.display_name}${payoutMode === "simulated" ? " (payout simulated)" : ""}`
+      : `Completed ${v.services?.name}; charged and paid ${v.providers?.display_name} (simulated)`,
+    { visit: v.id, mode: captureMode, credit: creditUsed },
     at,
   );
   // Ask for a rating in the chat with this provider. Only for visits that just finished,
