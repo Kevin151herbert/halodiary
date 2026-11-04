@@ -2,9 +2,9 @@
 // anything above the user's per-payment limit is refused, logged and reported to the user.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { changeCost, getVisit } from "./actions-core";
-import { defaultWeekdays, visitsPerMonth } from "./cadence";
-import { forecastMonth, log, monthKey, nowFor } from "./engine";
-import { monthLabel } from "./time";
+import { defaultWeekdays, occurrences, visitsInMonth } from "./cadence";
+import { forecastMonth, log, nowFor } from "./engine";
+import { dayKey, monthKey, monthLabel, monthRange } from "./time";
 import type { Profile } from "./supabase/server";
 
 /** Outside agents (MCP) get this limit until the user sets their own. */
@@ -58,21 +58,33 @@ export async function blockReason(supabase: SupabaseClient, profile: Profile, or
       agent: `Refused by the user's spending limit: ${money(amount, cur)} is over the ${money(limit, cur)} per payment an AI may approve. Ask the user to do this in HaloDiary, or to raise the limit in Settings.`,
     };
   if (tool === "add_recurring_service" && amount > 0) {
-    const month = monthKey(nowFor(profile), profile.timezone);
-    const [{ data: budget }, forecast] = await Promise.all([
-      supabase.from("budgets").select("cap, status").eq("client_id", profile.id).eq("month", month).maybeSingle(),
-      forecastMonth(supabase, profile, month),
-    ]);
-    const cap = budget?.status === "approved" ? Number(budget.cap) : profile.monthly_budget ? Number(profile.monthly_budget) : null;
+    // Price the new plan the way the diary will book it: the visits left this month, then a full next month.
+    const now = nowFor(profile);
+    const tz = profile.timezone;
     const weekdays = Array.isArray(input.weekdays) ? (input.weekdays as number[]) : defaultWeekdays(String(input.cadence));
-    const added = amount * visitsPerMonth(String(input.cadence), weekdays);
-    if (cap != null && forecast.total + added > cap)
-      return {
-        amount: added,
-        limit: cap,
-        user: `This adds about ${money(added, cur)} a month, taking ${monthLabel(month)} to ${money(forecast.total + added, cur)}, over your ${money(cap, cur)} budget. Raise the budget first, or choose a cheaper option.`,
-        agent: `Refused by the user's monthly budget: adding this service costs about ${money(added, cur)} a month and would take ${monthLabel(month)} to ${money(forecast.total + added, cur)}, over the approved ${money(cap, cur)}. Ask the user to raise the budget on the Budget page, or suggest a cheaper provider or cadence.`,
-      };
+    const timing = { cadence: String(input.cadence), weekdays, time_of_day: typeof input.time === "string" ? input.time : "10:00", start_date: dayKey(now, tz) };
+    for (const add of [0, 1]) {
+      const month = monthKey(now, tz, add);
+      const { end } = monthRange(month, tz);
+      const count = add === 0 ? occurrences(timing, now, end, tz).length : visitsInMonth(timing, month, tz).length;
+      if (!count) continue;
+      const [{ data: budget }, forecast] = await Promise.all([
+        supabase.from("budgets").select("cap, status").eq("client_id", profile.id).eq("month", month).maybeSingle(),
+        forecastMonth(supabase, profile, month),
+      ]);
+      const cap = budget?.status === "approved" ? Number(budget.cap) : profile.monthly_budget ? Number(profile.monthly_budget) : null;
+      const added = amount * count;
+      if (cap != null && forecast.total + added > cap) {
+        const visits = `${count} visit${count === 1 ? "" : "s"}`;
+        const period = add === 0 ? `the rest of ${monthLabel(month)}` : monthLabel(month);
+        return {
+          amount: added,
+          limit: cap,
+          user: `This adds ${money(added, cur)} (${visits}) in ${period}, taking ${monthLabel(month)} to ${money(forecast.total + added, cur)}, over your ${money(cap, cur)} budget. Raise the budget first, or choose a cheaper option.`,
+          agent: `Refused by the user's monthly budget: this service adds ${money(added, cur)} (${visits}) in ${period} and would take ${monthLabel(month)} to ${money(forecast.total + added, cur)}, over the approved ${money(cap, cur)}. Ask the user to raise the budget on the Budget page, or suggest a cheaper provider or cadence.`,
+        };
+      }
+    }
   }
   return null;
 }

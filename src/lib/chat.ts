@@ -182,7 +182,7 @@ export async function payRequest(supabase: SupabaseClient, profile: Profile, mes
   const amount = Number(req.amount);
   const r = await chargeExtra(supabase, profile, conv, amount, req.body, req.visit_id);
   await supabase.from("messages").update({ meta: { ...req.meta, paypal_ref: r.ref, mode: r.mode } }).eq("id", req.id);
-  const receipt = `Paid ${money(amount, profile.currency)} for "${req.body}" ${r.mode === "paypal_sandbox" ? "with PayPal" : "(simulated PayPal)"}. ${conv.providers?.display_name} receives ${money(r.share, profile.currency)}.`;
+  const receipt = `Paid ${money(amount, profile.currency)} for "${req.body}" ${r.mode === "paypal_sandbox" ? "with PayPal" : "(simulated PayPal)"}, charged now. ${conv.providers?.display_name} receives ${money(r.share, profile.currency)}.`;
   await post(supabase, conv.id, { sender: "system", kind: "payment", body: receipt, amount, reply_to: req.id, visit_id: req.visit_id, meta: { paypal_ref: r.ref, mode: r.mode } });
   await pingProvider(supabase, conv, `${profile.full_name || "Your client"} paid ${money(amount, profile.currency)}`);
   await log(supabase, profile.id, "user", `Paid ${conv.providers?.display_name} ${money(amount, profile.currency)} in chat for ${req.body}`, { message: req.id, mode: r.mode });
@@ -196,7 +196,7 @@ export async function sendPayment(supabase: SupabaseClient, profile: Profile, co
   if (!conv || conv.client_id !== profile.id) return { error: "Conversation not found" };
   const what = note.trim().slice(0, 140) || "Extra payment";
   const r = await chargeExtra(supabase, profile, conv, Math.round(amount * 100) / 100, what, null);
-  const receipt = `Paid ${money(amount, profile.currency)} for "${what}" ${r.mode === "paypal_sandbox" ? "with PayPal" : "(simulated PayPal)"}. ${conv.providers?.display_name} receives ${money(r.share, profile.currency)}.`;
+  const receipt = `Paid ${money(amount, profile.currency)} for "${what}" ${r.mode === "paypal_sandbox" ? "with PayPal" : "(simulated PayPal)"}, charged now. ${conv.providers?.display_name} receives ${money(r.share, profile.currency)}.`;
   await post(supabase, conv.id, { sender: "system", kind: "payment", body: receipt, amount, meta: { paypal_ref: r.ref, mode: r.mode } });
   await pingProvider(supabase, conv, `${profile.full_name || "Your client"} sent you ${money(amount, profile.currency)}`);
   await log(supabase, profile.id, "user", `Sent ${conv.providers?.display_name} ${money(amount, profile.currency)} in chat`, { mode: r.mode });

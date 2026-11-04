@@ -226,10 +226,10 @@ export async function movePreview(supabase: SupabaseClient, profile: Profile, vi
     const contract = await governingContract(supabase, await planIdForVisit(supabase, v));
     const hoursUntil = (new Date(v.scheduled_at).getTime() - nowFor(profile).getTime()) / 3_600_000;
     const c = contract?.status === "active" ? providerChangeCredit(contract.terms, { price: Number(v.price), hoursUntil, kind: "move" }) : { late: false, credit: 0, reason: "" };
-    return { ok: true, side: "provider" as const, late: c.late, amount: c.credit, reason: c.reason, service: v.services?.name ?? "Visit" };
+    return { ok: true, side: "provider" as const, late: c.late, amount: c.credit, reason: c.reason, service: v.services?.name ?? "Visit", status: v.status };
   }
   const c = await changeCost(supabase, profile, v, "reschedule");
-  return { ok: true, side: "client" as const, late: c.late, amount: c.fee, reason: c.reason, service: v.services?.name ?? "Visit" };
+  return { ok: true, side: "client" as const, late: c.late, amount: c.fee, reason: c.reason, service: v.services?.name ?? "Visit", status: v.status };
 }
 
 /** The client's answer to a day-before check (or any upcoming visit). */

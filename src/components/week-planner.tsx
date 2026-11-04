@@ -26,7 +26,7 @@ type Pending = {
   visit: PlannerVisit;
   local: string; // YYYY-MM-DDTHH:mm in the viewer's time zone
   label: string;
-  preview: { late: boolean; amount: number; reason: string } | null;
+  preview: { late: boolean; amount: number; reason: string; status?: string } | null;
   error?: string;
   resolve: (ok: boolean) => void;
 };
@@ -207,7 +207,10 @@ export function WeekPlanner({
                     Late change: a fee of <b>{money(pending.preview.amount)}</b> is charged through PayPal ({pending.preview.reason}).
                   </>
                 ) : (
-                  <>Free under your agreement. Your PayPal hold moves with the visit.</>
+                  <>
+                    {pending.preview.late ? "A late move, but your agreement charges nothing for it." : "No fee: there is enough notice under your agreement."}{" "}
+                    {pending.preview.status === "confirmed" ? "Your PayPal hold moves with the visit." : "The visit is held on PayPal once it is confirmed."}
+                  </>
                 )
               ) : pending.preview.amount > 0 ? (
                 <>

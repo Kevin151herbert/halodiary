@@ -65,7 +65,7 @@ export default function Landing() {
               <DemoLoginButton role="client" variant="ghost" label="Set up my own household" className="px-6 py-3.5" />
             </div>
             <div className="mt-3 flex flex-wrap items-center gap-x-1 text-xs text-slate">
-              <span>One click, no email. The tour gives you a ready household in Barcelona; payments run in the PayPal sandbox. Run a service business?</span>
+              <span>One click, no email. The tour gives you a ready household in Barcelona; to swipe through matches yourself, choose Set up my own household. Payments run in the PayPal sandbox. Run a service business?</span>
               <DemoLinkProvider />
             </div>
             <ul className="mt-6 flex flex-wrap gap-2 text-[11px] font-bold text-slate" aria-label="Built on">

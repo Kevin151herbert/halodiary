@@ -156,7 +156,8 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
           </table>
         </Card>
 
-        <Card className="flex flex-col p-6">
+        <div id="approve" className="scroll-mt-24">
+        <Card className="flex h-full flex-col p-6">
           {budget?.status === "approved" ? (
             <>
               <p className="text-sm font-bold text-sage">Approved {budget.approval_mode === "paypal_sandbox" ? "with PayPal sandbox" : "(simulated)"}</p>
@@ -245,6 +246,7 @@ export default async function BudgetPage({ searchParams }: { searchParams: Promi
             </>
           )}
         </Card>
+        </div>
       </section>
 
       <MoneyTrail supabase={supabase} profile={p} />

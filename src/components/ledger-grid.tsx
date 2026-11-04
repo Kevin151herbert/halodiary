@@ -102,6 +102,7 @@ export function LedgerGrid({ rows, currency, fileName, partyLabel = "Provider" }
           <Download size={16} aria-hidden /> CSV
         </button>
       </div>
+      <p className="mb-2 text-xs text-slate sm:hidden">Scroll sideways to see every column.</p>
       <div className="clay overflow-hidden p-1.5" style={{ height: Math.min(560, 120 + rows.length * 42) }}>
         <AgGridReact<LedgerRow>
           ref={grid}

@@ -2,6 +2,7 @@
 
 import { Check, ChevronDown, Sparkles, X } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useState, useTransition } from "react";
 import { btn } from "@/components/ui";
 import { dismissTourAction } from "../start/actions";
@@ -22,6 +23,7 @@ export function TourGuide({ state }: { state: TourState }) {
   const [providerSeen, setProviderSeen] = useState(false);
   const [open, setOpen] = useState(true);
   const [pending, start] = useTransition();
+  const onBudget = usePathname() === "/app/budget";
   useEffect(() => {
     try {
       setProviderSeen(localStorage.getItem("hd-tour-provider") === "1");
@@ -59,7 +61,11 @@ export function TourGuide({ state }: { state: TourState }) {
           )}
         </>
       ),
-      action: (
+      action: onBudget ? (
+        <a href="#approve" className={`${btn.primary} px-4 py-2 text-sm`}>
+          Show me the button
+        </a>
+      ) : (
         <Link href="/app/budget" className={`${btn.primary} px-4 py-2 text-sm`}>
           Go to Budget
         </Link>

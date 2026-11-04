@@ -88,7 +88,7 @@ export function ScheduleCalendar({
           </h2>
           <p className="text-sm text-slate">
             {monthVisits.length} visits in {fmt(`${key}T12:00:00Z`, "UTC", { month: "long" })}, {money(monthEarn)} to you
-            {busiest ? ` · busiest day ${busiest}` : ""}
+            {busiest ? ` · busiest day: ${busiest} visit${busiest === 1 ? "" : "s"}` : ""}
           </p>
         </div>
         <div className="flex items-center gap-2">

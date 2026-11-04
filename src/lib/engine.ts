@@ -205,7 +205,9 @@ export async function forecastMonth(supabase: SupabaseClient, profile: Profile, 
     .eq("status", "active");
   type P = Plan & { services: { name: string }; providers: { display_name: string }; billing?: string; monthly_price?: number | null };
   const lines = ((plans ?? []) as P[]).map((p) => {
-    const count = visitsInMonth(p, month, profile.timezone).length;
+    // A slot earlier the same day the plan was created was never booked, so it does not count.
+    const created = new Date((p as { created_at?: string }).created_at ?? 0).getTime();
+    const count = visitsInMonth(p, month, profile.timezone).filter((d) => d.getTime() >= created).length;
     const subscribed = p.billing === "subscription" && p.monthly_price;
     return {
       planId: p.id,
@@ -307,10 +309,14 @@ async function holdPayment(supabase: SupabaseClient, profile: Profile, v: VisitR
     // Held when confirmed, or at the 2-hour cut-off when nobody answered and the time skip went past it.
     created_at: new Date(Math.min(nowFor(profile).getTime(), new Date(v.scheduled_at).getTime() - 2 * 3_600_000)).toISOString(),
   });
-  await log(supabase, profile.id, "system", `Held ${fmtMoney(Number(v.price), profile.currency)} for ${v.services?.name}`, {
-    visit: v.id,
-    mode,
-  });
+  await log(
+    supabase,
+    profile.id,
+    "system",
+    `Held ${fmtMoney(Number(v.price), profile.currency)} for ${v.services?.name}`,
+    { visit: v.id, mode },
+    new Date(Math.min(nowFor(profile).getTime(), new Date(v.scheduled_at).getTime() - 2 * 3_600_000)).toISOString(),
+  );
   return true;
 }
 
@@ -603,7 +609,8 @@ export async function advance(supabase: SupabaseClient, profile: Profile) {
     if ((v.client_response === "proceed" || silentPastCutoff) && providerOk) {
       if (silentPastCutoff) {
         await supabase.from("visits").update({ client_response: "proceed" }).eq("id", v.id);
-        await log(supabase, profile.id, "system", `No reply by the cut-off, so ${v.services?.name} goes ahead`, { visit: v.id });
+        const cutoffAt = new Date(Math.min(nowFor(profile).getTime(), new Date(v.scheduled_at).getTime() - 2 * 3_600_000)).toISOString();
+        await log(supabase, profile.id, "system", `No reply by the cut-off, so ${v.services?.name} goes ahead`, { visit: v.id }, cutoffAt);
       }
       await holdPayment(supabase, profile, v);
     }

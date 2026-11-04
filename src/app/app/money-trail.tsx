@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { Check, Clock, Hourglass } from "lucide-react";
+import { Check, CircleDot, Clock, Hourglass } from "lucide-react";
 import type { Profile } from "@/lib/supabase/server";
 import { fmt } from "@/lib/time";
 import { TrailRefresher } from "./trail-refresher";
@@ -47,7 +47,7 @@ export async function MoneyTrail({ supabase, profile }: { supabase: SupabaseClie
       <h2 id="money" className="text-xl font-bold">
         Where your money is
       </h2>
-      <p className="mt-1 text-sm text-slate">Each visit is held on PayPal when confirmed, charged only after it happens, then paid out. A tick means PayPal confirmed it.</p>
+      <p className="mt-1 text-sm text-slate">Each visit is held on PayPal when confirmed, charged only after it happens, then paid out. A tick means PayPal confirmed it; a dot means the step was simulated.</p>
       <ul className="mt-4 space-y-4">
         {visits.map(([id, ls]) => {
           const v = ls[0].visits;
@@ -84,7 +84,7 @@ export async function MoneyTrail({ supabase, profile }: { supabase: SupabaseClie
                           ) : paypal ? (
                             <Hourglass size={14} className="text-halo" aria-label="Waiting for PayPal to confirm" />
                           ) : (
-                            <Check size={14} className="text-slate" aria-label="Done (simulated)" />
+                            <CircleDot size={14} className="text-slate" aria-label="Done (simulated, no PayPal confirmation)" />
                           )
                         ) : (
                           <Clock size={14} aria-label="Not yet" />

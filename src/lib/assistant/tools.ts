@@ -13,7 +13,7 @@ import { sendMonthlyStatement } from "../paypal-agent";
 import { TERM_OPTIONS } from "../contract";
 import { forecastMonth, monthKey, nowFor, spentInMonth } from "../engine";
 import type { Profile } from "../supabase/server";
-import { fmtShort, monthLabel } from "../time";
+import { fmtMoney, fmtShort, monthLabel } from "../time";
 import { blockReason, guardPayment, type AgentOrigin } from "../agent-guard";
 
 const cadenceEnum = z.enum(CADENCE_KEYS as [string, ...string[]]);
@@ -61,7 +61,7 @@ export function buildTools(supabase: SupabaseClient, profile: Profile, origin: A
           name: r.display_name,
           service_id: r.service_id,
           headline: r.headline,
-          price: `${cur} ${Number(r.price).toFixed(2)}`,
+          price: fmtMoney(Number(r.price), cur),
           rating: Number(r.rating),
           reviews: r.review_count,
           distance_km: r.distance_km,
@@ -80,7 +80,7 @@ export function buildTools(supabase: SupabaseClient, profile: Profile, origin: A
           when: fmtShort(v.scheduled_at, tz),
           service: v.services?.name,
           provider: v.providers?.display_name,
-          price: `${cur} ${Number(v.price).toFixed(2)}`,
+          price: fmtMoney(Number(v.price), cur),
           status: v.status,
           needs_client_answer: v.status === "awaiting" && !v.client_response,
         }));
@@ -137,7 +137,7 @@ export function buildTools(supabase: SupabaseClient, profile: Profile, origin: A
         return (data ?? []).map((e) => ({
           when: fmtShort(e.created_at, tz),
           kind: e.kind,
-          amount: `${cur} ${Number(e.amount).toFixed(2)}`,
+          amount: fmtMoney(Number(e.amount), cur),
           provider: (e.providers as unknown as { display_name: string })?.display_name,
           service: (e.visits as unknown as { services: { name: string } })?.services?.name,
           paypal_ref: e.paypal_ref,
@@ -159,7 +159,7 @@ export function buildTools(supabase: SupabaseClient, profile: Profile, origin: A
         cadence: cadenceEnum,
         weekdays: z.array(z.number().int().min(0).max(6)).optional(),
         time: z.string().regex(/^\d{2}:\d{2}$/).optional().describe("HH:mm local time, default 10:00"),
-        price_per_visit: z.string().describe(`Price shown to the user, e.g. '${cur} 35.00'`),
+        price_per_visit: z.string().describe(`Price shown to the user, e.g. '${fmtMoney(35, cur)}'`),
       }),
       execute: async (i) => {
         const res = await core.createPlan(

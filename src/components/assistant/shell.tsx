@@ -67,25 +67,34 @@ const SUGGESTIONS: Record<string, string[]> = {
 
 /** Very small markdown: **bold**, line breaks and "- " bullets. */
 function Text({ text }: { text: string }) {
+  const inline = (s: string) =>
+    s.split(/(\*\*[^*]+\*\*)/g).map((seg, j) => (seg.startsWith("**") ? <strong key={j}>{seg.slice(2, -2)}</strong> : <span key={j}>{seg}</span>));
+  const isBullet = (l: string) => /^\s*[-*] /.test(l);
+  // Split each block into runs of plain lines and runs of "- " bullets, so a heading line followed by a list renders both.
+  const parts: { list: boolean; lines: string[] }[] = [];
+  for (const block of text.split(/\n{2,}/)) {
+    let prev: { list: boolean; lines: string[] } | null = null;
+    for (const l of block.split("\n")) {
+      const list = isBullet(l);
+      if (prev && prev.list === list) prev.lines.push(l);
+      else parts.push((prev = { list, lines: [l] }));
+    }
+  }
   return (
     <div className="space-y-2">
-      {text.split(/\n{2,}/).map((block, i) => {
-        const lines = block.split("\n");
-        const bullets = lines.every((l) => /^\s*[-*] /.test(l));
-        const inline = (s: string) =>
-          s.split(/(\*\*[^*]+\*\*)/g).map((seg, j) => (seg.startsWith("**") ? <strong key={j}>{seg.slice(2, -2)}</strong> : <span key={j}>{seg}</span>));
-        return bullets ? (
+      {parts.map((p, i) =>
+        p.list ? (
           <ul key={i} className="list-disc space-y-1 pl-5">
-            {lines.map((l, j) => (
+            {p.lines.map((l, j) => (
               <li key={j}>{inline(l.replace(/^\s*[-*] /, ""))}</li>
             ))}
           </ul>
         ) : (
           <p key={i} className="whitespace-pre-wrap">
-            {inline(block)}
+            {inline(p.lines.join("\n"))}
           </p>
-        );
-      })}
+        ),
+      )}
     </div>
   );
 }
@@ -110,11 +119,12 @@ function ProviderResults({ output }: { output: unknown }) {
 
 /** What approving a new service means: the monthly cost and the agreement the assistant will sign for you. */
 function PlanTerms({ input }: { input: Record<string, unknown> }) {
-  const price = Number(String(input.price_per_visit ?? "").replace(/[^0-9.]/g, "")) || 0;
+  const price = Number(String(input.price_per_visit ?? "").replace(/[^0-9.]/g, "")) || 0; // "€35.00", "EUR 35.00" or "€1,035.00"
   const t = defaultTermsFor(String(input.service_id ?? ""));
   const weekdays = Array.isArray(input.weekdays) ? (input.weekdays as number[]) : defaultWeekdays(String(input.cadence));
   const monthly = price * visitsPerMonth(String(input.cadence), weekdays);
-  const code = String(input.price_per_visit ?? "").match(/[A-Z]{3}/)?.[0] ?? "EUR";
+  const shown = String(input.price_per_visit ?? "");
+  const code = shown.match(/[A-Z]{3}/)?.[0] ?? (shown.includes("£") ? "GBP" : shown.includes("$") ? "USD" : "EUR");
   const fmtMoney = (n: number) => new Intl.NumberFormat("en-GB", { style: "currency", currency: code, maximumFractionDigits: 0 }).format(n);
   return (
     <ul className="mt-2 space-y-1 text-xs text-slate">

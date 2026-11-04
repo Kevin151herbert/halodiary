@@ -71,12 +71,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="sticky top-0 z-20 flex items-center justify-between bg-paper/85 px-5 py-3 backdrop-blur md:hidden">
             <Logo />
+            {profile.clock_offset_hours !== 0 && (
+              <span className="clay-inset px-3 py-1 text-xs font-bold text-ink">Demo time: {fmtShort(now, profile.timezone)}</span>
+            )}
           </header>
           <main className="mx-auto w-full max-w-5xl flex-1 px-5 pb-28 pt-6 sm:px-8 md:pb-12 md:pt-10">
             {tour && <TourGuide state={tour} />}
             {children}
           </main>
-          <div className="clay fixed inset-x-3 bottom-3 z-20 md:hidden">
+          <div className="clay fixed inset-x-3 bottom-3 z-[35] md:hidden">
             <Nav role={profile.role} unread={unread ?? 0} chats={chats} compact />
           </div>
         </div>

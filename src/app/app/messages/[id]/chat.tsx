@@ -344,7 +344,11 @@ function Bubble({
           </span>
           <span>
             {m.body}
-            {typeof m.meta?.paypal_ref === "string" && <code className="ml-1 text-[11px] text-slate">{m.meta.paypal_ref}</code>}
+            {typeof m.meta?.paypal_ref === "string" && (
+              <span className="mt-0.5 block text-[11px] text-slate">
+                Reference <code>{m.meta.paypal_ref}</code>
+              </span>
+            )}
           </span>
         </span>
       </li>
@@ -635,6 +639,7 @@ function PayPanel({
   return (
     <div className="clay-inset mb-3 space-y-3 p-4">
       <p className="text-sm font-bold">Pay {first} for something extra, or leave a tip</p>
+      <p className="-mt-2 text-xs text-slate">Charged straight away, separately from any visit hold. {first} gets 90% of it.</p>
       <div className="flex gap-2">
         <label className="w-28 text-xs font-bold text-slate">
           Amount ({currency})
