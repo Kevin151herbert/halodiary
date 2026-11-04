@@ -374,10 +374,16 @@ Rules:
       `Payment request: ${reply.quote.description}`,
     );
     if ("message" in r) request = r.message!;
-    if (last.kind === "extra_request") await supabase.from("messages").update({ status: "accepted" }).eq("id", last.id);
+  }
+  // An extra request is answered either way: quoted, or turned down in the reply.
+  let answered: Message | null = null;
+  if (last.kind === "extra_request" && last.status === "open") {
+    const status = request ? "accepted" : "declined";
+    await supabase.from("messages").update({ status }).eq("id", last.id);
+    answered = { ...last, status } as Message;
   }
   await log(supabase, profile.id, "system", `${first} replied in chat${request ? ` with a ${money(Number(request.amount), cur)} quote` : ""}`, { conversation: conversationId });
-  return { ok: true, reply: "message" in sent ? sent.message : null, request };
+  return { ok: true, reply: "message" in sent ? sent.message : null, request, answered };
 }
 
 /** The model's conversation must open with the client speaking. */

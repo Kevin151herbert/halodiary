@@ -6,7 +6,7 @@ import { upcomingVisits } from "../actions-core";
 import { cadenceLabel } from "../cadence";
 import { forecastMonth, monthKey, nowFor, spentInMonth } from "../engine";
 import type { Profile } from "../supabase/server";
-import { fmtShort, monthLabel } from "../time";
+import { fmtMoney, fmtShort, monthLabel } from "../time";
 
 const PAGE_NAMES: Record<string, string> = {
   "/app": "Diary (their schedule and day-before checks)",
@@ -47,8 +47,14 @@ export async function buildContext(supabase: SupabaseClient, profile: Profile, p
     if (!plans?.length) lines.push("- none yet");
     for (const p of plans ?? [])
       lines.push(
-        `- plan ${p.id}: ${p.services?.name} with ${p.providers?.display_name} (provider ${p.provider_id}), ${cadenceLabel(p.cadence, p.weekdays)} at ${String(p.time_of_day).slice(0, 5)}, ${profile.currency} ${Number(p.price).toFixed(2)} a visit, status ${p.status}`,
+        `- plan ${p.id}: ${p.services?.name} with ${p.providers?.display_name} (provider ${p.provider_id}), ${cadenceLabel(p.cadence, p.weekdays)} at ${String(p.time_of_day).slice(0, 5)}, ${fmtMoney(Number(p.price), profile.currency)} a visit, status ${p.status}`,
       );
+
+    // Several plans for one service (weekday walks and weekend walks, say) are intended, not duplicates.
+    const byService = new Map<string, number>();
+    for (const p of plans ?? []) byService.set(p.services?.name ?? "", (byService.get(p.services?.name ?? "") ?? 0) + 1);
+    for (const [name, n] of byService)
+      if (n > 1) lines.push(`- note: ${name} has ${n} separate plans on purpose (different days, times or providers). They are not duplicates; never suggest ending one unless the user asks.`);
 
     const { data: contracts } = await supabase
       .from("contracts")
@@ -84,20 +90,20 @@ export async function buildContext(supabase: SupabaseClient, profile: Profile, p
         `- ${(c.providers as unknown as { display_name: string })?.display_name} (provider ${c.provider_id}): last "${c.last_message}"${c.last_message_at > c.client_read_at ? " (UNREAD)" : ""}, open at /app/messages/${c.id}`,
       );
     for (const r of openRequests ?? [])
-      lines.push(`- OPEN PAYMENT REQUEST from ${((r.conversations as unknown as { providers: { display_name: string } })?.providers)?.display_name}: ${r.body}, ${profile.currency} ${Number(r.amount).toFixed(2)}`);
+      lines.push(`- OPEN PAYMENT REQUEST from ${((r.conversations as unknown as { providers: { display_name: string } })?.providers)?.display_name}: ${r.body}, ${fmtMoney(Number(r.amount), profile.currency)}`);
 
     lines.push("", "NEXT 10 DAYS OF VISITS:");
     if (!visits.length) lines.push("- none");
     for (const v of visits.slice(0, 25))
       lines.push(
-        `- visit ${v.id}: ${fmtShort(v.scheduled_at, tz)}, ${v.services?.name} with ${v.providers?.display_name}, ${profile.currency} ${Number(v.price).toFixed(2)}, status ${v.status}${v.status === "awaiting" && !v.client_response ? " (WAITING FOR THE CLIENT'S ANSWER)" : ""}${v.provider_response === "cancel" ? ` (provider cancelled: ${v.cancel_reason})` : ""}, starts in ${Math.round((new Date(v.scheduled_at).getTime() - now.getTime()) / 3_600_000)}h`,
+        `- visit ${v.id}: ${fmtShort(v.scheduled_at, tz)}, ${v.services?.name} with ${v.providers?.display_name}, ${fmtMoney(Number(v.price), profile.currency)}, status ${v.status}${v.status === "awaiting" && !v.client_response ? " (WAITING FOR THE CLIENT'S ANSWER)" : ""}${v.provider_response === "cancel" ? ` (provider cancelled: ${v.cancel_reason})` : ""}, starts in ${Math.round((new Date(v.scheduled_at).getTime() - now.getTime()) / 3_600_000)}h`,
       );
 
     lines.push(
       "",
-      `BUDGET ${monthLabel(month)}: forecast ${profile.currency} ${forecast.total.toFixed(2)}, suggested cap ${profile.currency} ${forecast.cap.toFixed(2)}; ` +
+      `BUDGET ${monthLabel(month)}: forecast ${fmtMoney(forecast.total, profile.currency)}, suggested cap ${fmtMoney(forecast.cap, profile.currency)}; ` +
         (budget?.status === "approved"
-          ? `APPROVED cap ${profile.currency} ${Number(budget.cap).toFixed(2)} (${budget.approval_mode === "paypal_sandbox" ? "via PayPal" : "simulated"}), used ${profile.currency} ${spent.toFixed(2)}, left ${profile.currency} ${(Number(budget.cap) - spent).toFixed(2)}.`
+          ? `APPROVED cap ${fmtMoney(Number(budget.cap), profile.currency)} (${budget.approval_mode === "paypal_sandbox" ? "via PayPal" : "simulated"}), used ${fmtMoney(spent, profile.currency)}, left ${fmtMoney((Number(budget.cap) - spent), profile.currency)}.`
           : "NOT APPROVED yet, so visits cannot be confirmed and paid until it is."),
       `PayPal account saved: ${profile.paypal_payment_token ? "yes" : "no"}.`,
     );
@@ -109,7 +115,7 @@ export async function buildContext(supabase: SupabaseClient, profile: Profile, p
     lines.push("", me ? `PROVIDER LISTING: ${me.display_name} (${me.headline}), provider id ${me.id}.` : "No provider listing yet.");
     if (me) {
       const { data: services } = await supabase.from("provider_services").select("price, services(name)").eq("provider_id", me.id);
-      lines.push(`Offers: ${(services ?? []).map((s) => `${(s.services as unknown as { name: string })?.name} ${profile.currency} ${Number(s.price).toFixed(2)}`).join(", ")}`);
+      lines.push(`Offers: ${(services ?? []).map((s) => `${(s.services as unknown as { name: string })?.name} ${fmtMoney(Number(s.price), profile.currency)}`).join(", ")}`);
       const { data: visits } = await supabase
         .from("visits")
         .select("id, scheduled_at, status, price, provider_response, services(name)")

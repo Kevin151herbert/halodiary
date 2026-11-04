@@ -137,7 +137,13 @@ export async function createPlan(
   }
   await ensureVisits(supabase, profile);
   await advance(supabase, profile);
-  return { plan, contractId: contract.id, summary: `${service} with ${provider}, ${cadenceLabel(input.cadence, weekdays)} at ${(input.time || "10:00").slice(0, 5)}, ${fmtMoney(Number(ps.price), profile.currency)} a visit` };
+  return {
+    plan,
+    contractId: contract.id,
+    agreement: prov?.is_demo
+      ? "Standard agreement already signed by both the user and the provider; it is active."
+      : "Signed by the user; waiting for the provider to sign.",
+    summary: `${service} with ${provider}, ${cadenceLabel(input.cadence, weekdays)} at ${(input.time || "10:00").slice(0, 5)}, ${fmtMoney(Number(ps.price), profile.currency)} a visit` };
 }
 
 export async function setPlanStatus(supabase: SupabaseClient, profile: Profile, planId: string, status: "active" | "paused" | "ended", actor: Actor) {

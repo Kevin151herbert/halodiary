@@ -168,7 +168,7 @@ export function buildTools(supabase: SupabaseClient, profile: Profile, origin: A
           { providerId: i.provider_id, serviceId: i.service_id, cadence: i.cadence, weekdays: i.weekdays, time: i.time },
           "assistant",
         );
-        return "error" in res && res.error ? { error: res.error } : { ok: true, added: res.summary };
+        return "error" in res && res.error ? { error: res.error } : { ok: true, added: res.summary, agreement: res.agreement };
       },
     }),
 

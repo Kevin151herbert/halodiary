@@ -106,7 +106,7 @@ export function Chat({ conversationId, initial, as, otherName, isDemo, currency,
     setTyping(true);
     try {
       const r = await demoReplyAction(conversationId);
-      if (r && "reply" in r) merge([r.reply, r.request].filter(Boolean) as Message[]);
+      if (r && "reply" in r) merge([r.reply, r.request, "answered" in r ? r.answered : null].filter(Boolean) as Message[]);
     } finally {
       setTyping(false);
     }
@@ -477,7 +477,7 @@ function Bubble({
           <p className={`text-[11px] font-bold uppercase tracking-wide ${mine ? "text-halo" : "text-slate"}`}>Extra service request</p>
           <p className="mt-1 whitespace-pre-wrap">{m.body}</p>
           <p className={`mt-2 text-[11px] ${mine ? "text-white/70" : "text-slate"}`}>
-            {time} · {m.status === "accepted" ? "Quoted" : `Waiting for ${mine ? first : "your"} quote`}
+            {time} · {m.status === "accepted" ? "Quoted" : m.status === "declined" ? "Declined" : `Waiting for ${mine ? `${first}'s` : "your"} quote`}
           </p>
         </div>
       </li>
