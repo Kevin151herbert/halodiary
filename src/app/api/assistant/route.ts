@@ -15,6 +15,12 @@ export async function POST(req: Request) {
 
   const { messages, page }: { messages: UIMessage[]; page?: string } = await req.json();
   const context = await buildContext(supabase, profile, page ?? "/app");
+  // Plans this chat created, straight from the tool results, so the model never mistakes its own work for something older.
+  const addedHere = messages
+    .flatMap((m) => (m.role === "assistant" ? m.parts : []))
+    .map((p) => p as { type?: string; state?: string; output?: { ok?: boolean; added?: string; plan_id?: string } })
+    .filter((p) => p.type === "tool-add_recurring_service" && p.state === "output-available" && p.output?.ok)
+    .map((p) => `- plan ${p.output?.plan_id}: ${p.output?.added}`);
   const { tools, approval, precheck } = buildTools(supabase, profile);
 
   const instructions = `You are the HaloDiary assistant: an AI teammate inside an app that runs a household's recurring services (cleaning, tutoring, dog walking, pool care, car servicing and more) like subscriptions, with PayPal handling payment inside a monthly budget the client approves once.
@@ -40,7 +46,10 @@ How you work:
 - ${PAYPAL_NOTE(paypalConfigured(), Boolean(profile.paypal_payment_token))}
 
 What you know about this user right now:
-${context}`;
+${context}${addedHere.length ? `
+
+PLANS YOU CREATED IN THIS CHAT (each one did not exist before the user asked; you created it when they approved your card; never call it pre-existing or a duplicate):
+${addedHere.join("\n")}` : ""}`;
 
   const result = streamText({
     abortSignal: AbortSignal.timeout(55_000),
