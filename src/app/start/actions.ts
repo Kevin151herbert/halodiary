@@ -217,11 +217,16 @@ export async function startTourAction() {
     500,
     picks.map((p) => ({ id: p.id, cadence: p.cadence, typical_price: Number(services?.find((s) => s.id === p.id)?.typical_price ?? 20) })),
   );
-  for (const p of picks) {
-    const best = (await rankProviders(supabase, me, p.id, t[p.id] ?? null, me.currency))[0];
-    if (!best) continue;
-    await core.createPlan(supabase, me, { providerId: best.provider_id, serviceId: p.id, cadence: p.cadence, weekdays: p.weekdays, time: p.time }, "user");
-  }
+  // Rank both services at once, add both plans, then let the diary page build the visits on its first load.
+  const ranked = await Promise.all(picks.map((p) => rankProviders(supabase, me, p.id, t[p.id] ?? null, me.currency)));
+  await Promise.all(
+    picks.map((p, k) => {
+      const best = ranked[k][0];
+      return best
+        ? core.createPlan(supabase, me, { providerId: best.provider_id, serviceId: p.id, cadence: p.cadence, weekdays: p.weekdays, time: p.time }, "user", { settle: false })
+        : null;
+    }),
+  );
   await log(supabase, profile.id, "user", "Started the guided tour");
   revalidatePath("/app", "layout");
   return { ok: true };

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { btn } from "@/components/ui";
 import { createClient } from "@/lib/supabase/client";
 import { startTourAction } from "./start/actions";
@@ -33,9 +33,16 @@ export function DemoLoginButton({
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [stage, setStage] = useState("Creating your household…");
+
+  // Warm the app while the visitor reads, so the first click doesn't wait for a cold server.
+  useEffect(() => {
+    if (tour) router.prefetch("/app");
+  }, [tour, router]);
 
   async function go() {
     setBusy(true);
+    setStage("Creating your household…");
     setError(null);
     const supabase = createClient();
     const id = Math.random().toString(36).slice(2, 8);
@@ -50,14 +57,15 @@ export function DemoLoginButton({
       return;
     }
     if (tour) {
+      setStage("Booking a cleaner and a dog walker…");
       const r = await startTourAction().catch(() => null);
       if (!r?.ok) {
         setBusy(false);
         setError("The tour could not start. Try \"Start as a client\" instead.");
         return;
       }
+      setStage("Opening your diary…");
       router.push("/app");
-      router.refresh();
       return;
     }
     router.push(role === "provider" ? "/onboarding" : "/start");
@@ -67,7 +75,7 @@ export function DemoLoginButton({
   return (
     <div className="flex flex-col gap-2">
       <button onClick={go} disabled={busy} className={`${btn[variant]} ${className}`}>
-        {busy ? (tour ? "Preparing your household…" : "Setting up…") : (label ?? (role === "provider" ? "Start as a provider" : "Start as a client"))}
+        {busy ? (tour ? stage : "Setting up…") : (label ?? (role === "provider" ? "Start as a provider" : "Start as a client"))}
       </button>
       {error && <p className="max-w-xs text-sm text-rose">{error}</p>}
     </div>

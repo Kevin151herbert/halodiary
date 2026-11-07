@@ -62,6 +62,7 @@ export async function createPlan(
   profile: Profile,
   input: { providerId: string; serviceId: string; cadence: string; weekdays?: number[]; time?: string; notes?: string; terms?: Partial<Terms> },
   actor: Actor,
+  opts: { settle?: boolean } = {},
 ) {
   if (!(input.cadence in CADENCES)) return { error: `Unknown cadence ${input.cadence}` };
   const { data: ps, error: psErr } = await supabase
@@ -135,8 +136,11 @@ export async function createPlan(
       body: "Review and sign the service agreement to start.",
     });
   }
-  await ensureVisits(supabase, profile);
-  await advance(supabase, profile);
+  // Callers adding several plans at once settle the diary once at the end instead.
+  if (opts.settle !== false) {
+    await ensureVisits(supabase, profile);
+    await advance(supabase, profile);
+  }
   return {
     plan,
     contractId: contract.id,
