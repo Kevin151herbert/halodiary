@@ -4,6 +4,7 @@ import "@fontsource/atkinson-hyperlegible/latin-400.css";
 import "@fontsource/atkinson-hyperlegible/latin-700.css";
 import "@fontsource-variable/inter/wght.css";
 import "./globals.css";
+import { BootScreen } from "./boot-screen";
 
 export const metadata: Metadata = {
   title: "HaloDiary: your recurring services, on autopilot",
@@ -13,8 +14,12 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en">
-      <body className="min-h-dvh">{children}</body>
+    // The boot screen script marks <html> as booted before React hydrates, hence the suppressed warning.
+    <html lang="en" suppressHydrationWarning>
+      <body className="min-h-dvh">
+        <BootScreen />
+        {children}
+      </body>
     </html>
   );
 }

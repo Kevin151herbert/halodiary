@@ -384,3 +384,82 @@ textarea.clay-inset:focus {
     animation-duration: 8s !important;
   }
 }
+
+/* ---------- Boot screen ---------- */
+#boot {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(60vmax 60vmax at 70% 20%, rgba(242, 184, 58, 0.16), transparent 70%), var(--paper);
+  transition:
+    opacity 380ms ease,
+    visibility 0s linear 380ms;
+  /* Without JavaScript nothing marks the page booted, so it steps aside on its own. */
+  animation: boot-out 0s linear 8s forwards;
+}
+@keyframes boot-out {
+  to {
+    visibility: hidden;
+    pointer-events: none;
+  }
+}
+html[data-booted] #boot {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.boot-mark {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: boot-in 520ms cubic-bezier(0.2, 0.75, 0.2, 1) both;
+}
+.boot-ring {
+  filter: drop-shadow(6px 8px 14px rgba(29, 34, 56, 0.14));
+  animation: boot-spin 1.6s linear infinite;
+}
+.boot-arc {
+  stroke-dasharray: 18 63;
+  animation: boot-fill 1.6s ease-in-out infinite;
+}
+.boot-word {
+  margin-top: 18px;
+  font-family: var(--font-display);
+  font-size: 1.75rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--ink);
+}
+.boot-tag {
+  margin-top: 4px;
+  font-size: 0.85rem;
+  color: var(--slate);
+  animation: boot-in 520ms 180ms cubic-bezier(0.2, 0.75, 0.2, 1) both;
+}
+@keyframes boot-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+}
+@keyframes boot-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes boot-fill {
+  50% {
+    stroke-dasharray: 44 63;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .boot-ring,
+  .boot-arc {
+    animation: none;
+  }
+  .boot-arc {
+    stroke-dasharray: 44 63;
+  }
+}
