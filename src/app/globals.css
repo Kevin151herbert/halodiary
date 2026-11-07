@@ -319,3 +319,68 @@ textarea.clay-inset:focus {
   opacity: 0.8;
   font-weight: 400;
 }
+
+/* ---------- Intro deck ---------- */
+.deck-glow {
+  position: absolute;
+  inset: -20% -10% auto auto;
+  width: 60vmax;
+  height: 60vmax;
+  pointer-events: none;
+  background: radial-gradient(closest-side, rgba(242, 184, 58, 0.22), rgba(242, 184, 58, 0) 70%);
+  animation: deck-drift 14s ease-in-out infinite alternate;
+}
+@keyframes deck-drift {
+  to {
+    transform: translate(-12vmax, 18vmax);
+  }
+}
+.deck-slide.deck-next {
+  animation: deck-in-next 560ms cubic-bezier(0.2, 0.75, 0.2, 1) both;
+}
+.deck-slide.deck-prev {
+  animation: deck-in-prev 560ms cubic-bezier(0.2, 0.75, 0.2, 1) both;
+}
+@keyframes deck-in-next {
+  from {
+    opacity: 0;
+    transform: translateX(48px);
+    filter: blur(6px);
+  }
+}
+@keyframes deck-in-prev {
+  from {
+    opacity: 0;
+    transform: translateX(-48px);
+    filter: blur(6px);
+  }
+}
+.deck-rise {
+  animation: deck-rise 640ms cubic-bezier(0.2, 0.75, 0.2, 1) both;
+  animation-delay: var(--d, 0ms);
+}
+@keyframes deck-rise {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.98);
+  }
+}
+.deck-bar {
+  width: 0;
+  animation-name: deck-bar;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+@keyframes deck-bar {
+  to {
+    width: 100%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .deck-glow {
+    animation: none;
+  }
+  .deck-bar {
+    animation-duration: 8s !important;
+  }
+}

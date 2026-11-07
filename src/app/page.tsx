@@ -2,6 +2,7 @@ import { BadgeCheck, Bot, CalendarHeart, Clock, CreditCard, FileSignature, Heart
 import Link from "next/link";
 import { ButtonLink, Halo, IconChip, Logo, RingGauge } from "@/components/ui";
 import { DemoLinkProvider, DemoLoginButton } from "./demo-login";
+import { IntroDeck, OpenIntroButton } from "./intro-deck";
 
 const week = [
   { day: "Mon", n: 1, fill: 0.25 },
@@ -31,6 +32,7 @@ const JUDGE = [
 export default function Landing() {
   return (
     <div className="mx-auto flex min-h-dvh max-w-6xl flex-col px-5 sm:px-8">
+      <IntroDeck />
       <header className="flex items-center justify-between py-6">
         <Logo />
         <nav className="flex items-center gap-1 sm:gap-2">
@@ -64,6 +66,7 @@ export default function Landing() {
               <DemoLoginButton role="client" tour label="Take the 90-second tour" className="px-7 py-3.5" />
               <DemoLoginButton role="client" variant="ghost" label="Set up my own household" className="px-6 py-3.5" />
             </div>
+            <OpenIntroButton className="mt-4 inline-flex items-center gap-2 text-sm font-bold text-ink underline decoration-halo decoration-2 underline-offset-4" />
             <div className="mt-3 flex flex-wrap items-center gap-x-1 text-xs text-slate">
               <span>One click, no email. The tour gives you a ready household in Barcelona; to swipe through matches yourself, choose Set up my own household. Payments run in the PayPal sandbox. Run a service business?</span>
               <DemoLinkProvider />
