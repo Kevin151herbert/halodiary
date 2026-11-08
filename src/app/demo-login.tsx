@@ -35,10 +35,11 @@ export function DemoLoginButton({
   const [error, setError] = useState<string | null>(null);
   const [stage, setStage] = useState("Creating your household…");
 
-  // Warm the app while the visitor reads, so the first click doesn't wait for a cold server.
+  // Warm the server while the visitor reads (a cheap request, nothing cached on the client),
+  // so the first click doesn't wait for a cold start.
   useEffect(() => {
-    if (tour) router.prefetch("/app");
-  }, [tour, router]);
+    if (tour) fetch("/login", { method: "HEAD" }).catch(() => {});
+  }, [tour]);
 
   async function go() {
     setBusy(true);
@@ -65,7 +66,8 @@ export function DemoLoginButton({
         return;
       }
       setStage("Opening your diary…");
-      router.push("/app");
+      // A full load of the new session's diary: nothing from the signed-out landing page can be reused by mistake.
+      window.location.assign("/app");
       return;
     }
     router.push(role === "provider" ? "/onboarding" : "/start");
