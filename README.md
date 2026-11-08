@@ -14,20 +14,29 @@ Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/) (Dev
 
 ## Testing it (judges)
 
-No sign-up or email is needed, and the demo stays free to test until judging ends.
+No sign-up or email is needed, and the demo stays free to test until judging ends. Payments run in the PayPal **sandbox**; no real money moves.
 
-1. Open https://halodiary.vercel.app and press **Start as a client**. A fresh demo account is created for you.
-2. Share your location or pick a city. The assistant greets you. Describe your routine in one sentence (for example *"cleaning twice a week and a dog walker at weekends, about 400 a month"*) or pick services yourself, then set a monthly budget.
-3. Meet your matches, ranked by attendance, ratings, distance, price fit and profile detail. Swipe right to pick or browse as a list, tap a card for the full profile, then sign the service agreements.
-4. On **Budget**, approve the month with the **PayPal** button (sandbox). Log in with the PayPal sandbox buyer below. The simulated button works too if you'd rather skip PayPal.
-5. On the **Diary**, drag a visit in the planner to move it and see the agreement's fee first. Use the **demo clock** (+1 day) to make day-before checks arrive, then go ahead, move or skip.
-6. **Messages** is the chat with each provider: ask for an extra service, get a quote, pay it with PayPal or as a PayPal invoice, report a problem and accept a refund. Demo providers reply through the AI.
-7. Once PayPal is approved, each service on the **Diary** offers **Pay ... /mo flat with PayPal (5% off)**, a PayPal subscription, and **Budget** offers **Get a PayPal statement** for the month.
-8. Press **Start as a provider** (from the login page) to see the other side: build a profile, **Load sample clients**, accept and sign a new client, and manage the month calendar, week planner, attendance, ratings and earnings.
-9. **Settings** has the AI switches, the **AI spending limit**, and **Outside AI assistants** to connect Claude Desktop or another agent to your diary.
-10. **Activity** shows every action and who took it: you, the assistant, an outside agent or the scheduler.
+### The 90-second tour (recommended)
 
-**PayPal sandbox buyer for the approval step:** `SANDBOX_BUYER_EMAIL` / `SANDBOX_BUYER_PASSWORD` (sandbox only, no real money). You can also use any PayPal sandbox personal account of your own.
+1. Open https://halodiary.vercel.app. A 60-second intro plays the first time (problem, cost, solution, how PayPal and AI are used). Reopen it any time with **Watch the 60-second intro**, or at https://halodiary.vercel.app/?intro=1.
+2. Press **Take the 90-second tour**. You get a ready household in Barcelona with a cleaner twice a week and a dog walker at weekends, and a five-step checklist at the top of every page:
+   1. **Approve the month once with PayPal** on Budget (JS SDK v6 popup, sandbox). Nothing is charged yet.
+   2. **Skip to tomorrow and confirm the visit.** The demo clock moves time forward; press **Proceed** on the day-before check and PayPal places a hold. On Fridays and Saturdays the weekend dog walk's check is already waiting, so the button reads **Show me the check**.
+   3. **Skip past the visit.** The hold is captured and the provider is paid out (90%). Watch it under **Where your money is** and in the ledger, with PayPal references and webhook ticks.
+   4. **Let the AI book, inside your limits.** The assistant books a babysitter after one tap, showing the monthly cost and agreement terms, then refuses a car service that is over the AI spending limit.
+   5. **See the provider's side:** schedule, attendance, ratings and payouts.
+
+### Exploring further
+
+- **Set up my own household** (on the landing page) runs the full onboarding: describe your routine in one sentence, then swipe through matches ranked by attendance, ratings, distance, price fit and profile detail, and sign the service agreements.
+- **Diary:** drag a visit in the planner to move it and see the agreement's fee or credit first. The demo clock (**Skip to tomorrow**, **+12 hours**, **+3 days**) makes checks, holds and payouts happen.
+- **Messages:** chat with each provider. Ask for an extra service, get a quote, pay it with PayPal or as a PayPal invoice, report a problem and accept a refund. Demo providers reply through the AI.
+- **Budget:** the PayPal ledger (AG Grid, CSV export), **Get a PayPal statement**, and per service **Pay … /mo flat with PayPal (5% off)** as a PayPal subscription.
+- **Start as a provider** (link under the landing buttons) shows the other side: build a profile, **Load sample clients**, accept and sign a new client, and manage the calendar, attendance, ratings and earnings.
+- **Settings:** the AI switches, the **AI spending limit**, and **Outside AI assistants** to connect Claude Desktop or another MCP agent to your diary.
+- **Activity:** every action and who took it: you, the assistant, an outside agent or the scheduler.
+
+**PayPal sandbox login for the approval step:** use any PayPal **sandbox personal account** (create one free under *Sandbox > Accounts* at developer.paypal.com). If you'd rather skip PayPal, open **Can't use PayPal right now?** under the PayPal button: every step still runs and is labelled "Simulated" in the ledger.
 
 Health check of the PayPal and scheduler wiring (open it while signed in to the demo): https://halodiary.vercel.app/api/paypal/health
 
@@ -47,11 +56,13 @@ Health check of the PayPal and scheduler wiring (open it while signed in to the 
 | Monthly statement | Invoicing: create, send, record payment | `sendMonthlyStatement` |
 | What actually happened | Signed webhooks confirm holds, captures, voids, refunds, payouts, disputes, subscriptions and invoices; disputes open a problem in the chat | `src/app/api/paypal/webhook` |
 
-The server uses the **PayPal Server SDK** (`@paypal/paypal-server-sdk`, generated by APIMatic) for orders, payments, vault and subscriptions, and the **PayPal Agent Toolkit** (`@paypal/agent-toolkit`) for products, invoices and statements. Without PayPal keys the app runs in a clearly labelled **simulated** mode, so the demo never breaks.
+The server uses the **PayPal Server SDK** (`@paypal/paypal-server-sdk`, generated by APIMatic) for orders, payments, vault and subscriptions, and the **PayPal Agent Toolkit** (`@paypal/agent-toolkit`) for products, invoices and statements. Without PayPal keys, or if a PayPal call fails, the app runs that step in a clearly labelled **simulated** mode, so the demo never breaks and nothing claims PayPal did what it didn't.
 
 ## How AI is used
 
-- **Assistant with tools** (`src/app/api/assistant`, `src/lib/assistant`): Claude through the Vercel AI SDK. Every request carries a fresh snapshot of the user's schedule, budget, agreements and open checks. Read tools run straight away; tools that change the diary or money pause for a one-tap approval card. It can be switched off, and the app keeps working without it.
+Model: **Anthropic Claude Sonnet 5.5** (`claude-sonnet-5-5`, set with `ANTHROPIC_MODEL`), called through the **Vercel AI SDK** (`ai`, `@ai-sdk/anthropic`). It powers every AI feature below.
+
+- **Assistant with tools** (`src/app/api/assistant`, `src/lib/assistant`): Claude with HaloDiary's own tools, streamed with the Vercel AI SDK. Every request carries a fresh snapshot of the user's schedule, budget, agreements and open checks. Read tools run straight away; tools that change the diary or money pause for a one-tap approval card. It can be switched off, and the app keeps working without it.
 - **PayPal Agent Toolkit, scoped to the user:** the toolkit runs server-side for the signed-in user only. The model never gets raw merchant tools that could see other customers.
 - **AI spending limit:** every AI action is priced first. Anything above the user's per-payment limit is refused, logged and sent to the user (`src/lib/agent-guard.ts`).
 - **MCP server for outside agents** (`src/app/api/mcp`): Claude Desktop, ChatGPT or any MCP client connects with a personal access token from Settings and gets the same tools under the user's own session and row level security. Every action needs a reason, which shows in Activity. Tokens can be disconnected at any time.
@@ -89,7 +100,7 @@ Render cron (every 10 min) → /api/cron/advance
 ### 1. Supabase
 
 1. Create a project at [supabase.com](https://supabase.com).
-2. In **SQL Editor**, run `supabase/migrations/0001_schema.sql` through `0009_job_runs.sql` in order, then `supabase/seed.sql`.
+2. In **SQL Editor**, run `supabase/migrations/0001_schema.sql` through `0009_job_runs.sql` in order, then `supabase/seed.sql`, then `0010_performance_indexes.sql` through `0017_multi_service_headlines.sql` in order.
 3. In **Authentication > Sign In / Providers > Email**, turn **Confirm email** off so the one-click demo accounts work.
 4. Copy the project URL, the publishable key and the service role key from **Project Settings > API**.
 
@@ -99,7 +110,7 @@ The seed holds 22 services, 87 demo providers and 340 reviews, stored as offsets
 
 1. At [developer.paypal.com](https://developer.paypal.com), create a sandbox app and copy its client ID and secret. Make sure Vault, Payouts, Subscriptions and Invoicing are enabled.
 2. Add a webhook pointing at `https://YOUR-APP/api/paypal/webhook` for all events and copy its ID.
-3. Create a sandbox personal account to approve budgets, and set `PAYPAL_PAYOUT_RECEIVER` to a sandbox email that receives payouts for demo providers.
+3. Create a sandbox personal account to approve budgets, and set `PAYPAL_PAYOUT_RECEIVER` to a sandbox email that receives payouts for demo providers. Optionally set `NEXT_PUBLIC_SANDBOX_BUYER_EMAIL` and `NEXT_PUBLIC_SANDBOX_BUYER_PASSWORD` to show a sandbox login on the tour card.
 
 ### 3. Environment
 
