@@ -9,7 +9,8 @@ An AI assistant (Claude) can find providers, book, move visits, answer checks, e
 Built for the [PayPal AI Hackathon](https://paypalaihackathon.devpost.com/) (Devpost, October to November 2026). The project was started during the submission period (first commit 31 October 2026).
 
 - **Live demo:** https://halodiary.vercel.app
-- **Demo video:** _YouTube link added at submission_
+- **Demo video:** https://youtu.be/47XUlaDFxpo
+- **Devpost:** https://devpost.com/software/halodiary
 - **Licence:** MIT
 
 ## Testing it (judges)
